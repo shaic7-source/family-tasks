@@ -4,7 +4,8 @@ import os
 from datetime import datetime
 import google.generativeai as genai
 
-GEMINI_API_KEY = "AIzaSyDSd9qQCtjQTDpCPGnMyLy6RssIHJ3feEI"
+# משיכת המפתח מתוך הכספת של Streamlit במקום לחשוף אותו בקוד
+GEMINI_API_KEY = st.secrets["GEMINI_API_KEY"]
 genai.configure(api_key=GEMINI_API_KEY)
 
 for k in ['msg_time', 'msg_task', 'msg_approve', 'msg_comp']:
@@ -130,13 +131,12 @@ if st.button("הכן סיכום יומי עכשיו"):
         prompt = f"אתה פלא, תוכי חצוף ומצחיק. סכם את היום של משפחת כהן.\nמשימות שבוצעו: {t_str}\nפירגונים: {c_str}"
 
         try:
-            # משיכת רשימת המודלים ישירות מגוגל ובחירת הראשון שתומך בטקסט
             working_model_name = None
             for m in genai.list_models():
                 if 'generateContent' in m.supported_generation_methods:
                     working_model_name = m.name
                     if 'flash' in working_model_name: 
-                        break # אם מצאנו מודל Flash מהיר, נעצור כאן וניקח אותו
+                        break 
             
             if working_model_name:
                 model = genai.GenerativeModel(working_model_name)
