@@ -11,13 +11,7 @@ for k in ['msg_time', 'msg_task', 'msg_approve', 'msg_comp']:
     if k not in st.session_state:
         st.session_state[k] = None
 
-css = "<style>"
-css += ".stApp { background: linear-gradient(135deg, #d1e8e2, #fffd8d, #ffc8dd, #90e0ef); direction: rtl; } "
-css += "p, div, span, h1, h2, h3, h4, h5, h6, label, input, textarea { text-align: right !important; direction: rtl !important; } "
-css += ".stButton>button { background-color: #ff9f43; color: white; border-radius: 20px; width: 100%; font-weight: bold; height: 3.5rem; border: none; } "
-css += ".pele-summary { background: white; padding: 20px; border-radius: 20px; border: 5px solid #ff6b6b; color: #333; margin-top: 20px; }"
-css += "</style>"
-st.markdown(css, unsafe_allow_html=True)
+st.markdown("<style>.stApp{background: linear-gradient(135deg, #d1e8e2, #fffd8d, #ffc8dd, #90e0ef); direction: rtl;} p,div,span,h1,h2,h3,h4,h5,h6,label,input,textarea{text-align: right !important; direction: rtl !important;} .stButton>button{background-color: #ff9f43; color: white; border-radius: 20px; width: 100%; font-weight: bold; height: 3.5rem; border: none;} .pele-summary{background: white; padding: 20px; border-radius: 20px; border: 5px solid #ff6b6b; color: #333; margin-top: 20px;}</style>", unsafe_allow_html=True)
 
 USERS = {"שי": "parent", "ענבל": "parent", "בארי": "child", "טנא": "child"}
 TASKS_DB = {
@@ -48,7 +42,6 @@ if data.get("last_date") != today_str:
     save_data(data)
 
 st.title("🏡 משימות משפחת פלא")
-
 user_select = st.selectbox("מי המשתמש?", [""] + list(USERS.keys()))
 
 if user_select:
@@ -136,21 +129,20 @@ if st.button("הכן סיכום יומי עכשיו"):
 
         prompt = f"אתה פלא, תוכי חצוף ומצחיק. סכם את היום של משפחת כהן.\nמשימות שבוצעו: {t_str}\nפירגונים: {c_str}"
 
-        # מנגנון שעוקף את שגיאת ה-404 על ידי ניסיון של כל המודלים
-        models_to_try = ['gemini-1.5-flash', 'gemini-1.5-pro', 'gemini-pro']
-        success = False
-        last_error = ""
-
-        for m_name in models_to_try:
-            try:
-                temp_model = genai.GenerativeModel(m_name)
-                res = temp_model.generate_content(prompt)
+        try:
+            # משיכת רשימת המודלים ישירות מגוגל ובחירת הראשון שתומך בטקסט
+            working_model_name = None
+            for m in genai.list_models():
+                if 'generateContent' in m.supported_generation_methods:
+                    working_model_name = m.name
+                    if 'flash' in working_model_name: 
+                        break # אם מצאנו מודל Flash מהיר, נעצור כאן וניקח אותו
+            
+            if working_model_name:
+                model = genai.GenerativeModel(working_model_name)
+                res = model.generate_content(prompt)
                 st.markdown(f'<div class="pele-summary"><h3>🦜 פלא אומר:</h3>{res.text}</div>', unsafe_allow_html=True)
-                success = True
-                break
-            except Exception as e:
-                last_error = str(e)
-                continue
-
-        if not success:
-            st.error(f"תקלה בחיבור מול גוגל. השגיאה האחרונה: {last_error}")
+            else:
+                st.error("לא נמצא מודל פתוח במפתח ה-API שלך.")
+        except Exception as e:
+            st.error(f"שגיאה בתקשורת מול גוגל: {e}")
