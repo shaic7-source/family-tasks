@@ -9,12 +9,6 @@ import google.generativeai as genai
 GEMINI_API_KEY = st.secrets["GEMINI_API_KEY"]
 genai.configure(api_key=GEMINI_API_KEY)
 
-# אתחול משתני מצב
-if 'stopwatch_running' not in st.session_state:
-    st.session_state.stopwatch_running = False
-if 'start_time' not in st.session_state:
-    st.session_state.start_time = 0
-
 for k in ['msg_time', 'msg_task', 'msg_approve', 'msg_comp']:
     if k not in st.session_state:
         st.session_state[k] = None
@@ -29,7 +23,14 @@ TASKS_DB = {
 DATA_FILE = 'family_data.json'
 
 def load_data():
-    default_data = {"screen_time": {u: 0 for u in USERS}, "tasks_today": [], "compliments": [], "last_date": str(datetime.now().date()), "updates_applied": []}
+    default_data = {
+        "screen_time": {u: 0 for u in USERS}, 
+        "tasks_today": [], 
+        "compliments": [], 
+        "last_date": str(datetime.now().date()), 
+        "updates_applied": [],
+        "active_stopwatches": {} # שומר את שעת ההתחלה במסד הנתונים
+    }
     if os.path.exists(DATA_FILE):
         try:
             with open(DATA_FILE, 'r', encoding='utf-8') as f:
@@ -68,30 +69,34 @@ if user_select:
     role = USERS[user_select]
     st.subheader(f"שלום {user_select}! 🦜 יתרה: {data['screen_time'][user_select]} דקות")
 
-    # --- סטופר זמן מסך (ניצול יתרה) ---
+    # --- סטופר מבוסס ענן למניעת איפוס ביציאה מהאפליקציה ---
     st.subheader("⏱️ סטופר זמן מסך")
     col1, col2 = st.columns(2)
     
-    if not st.session_state.stopwatch_running:
+    active_watches = data.get("active_stopwatches", {})
+    
+    if user_select not in active_watches:
         if col1.button("▶️ התחל זמן מסך"):
-            st.session_state.start_time = time.time()
-            st.session_state.stopwatch_running = True
+            if "active_stopwatches" not in data: data["active_stopwatches"] = {}
+            data["active_stopwatches"][user_select] = time.time()
+            save_data(data)
             st.rerun()
     else:
-        elapsed_now = int((time.time() - st.session_state.start_time) / 60)
+        start_time = active_watches[user_select]
+        elapsed_now = int((time.time() - start_time) / 60)
         st.warning(f"זמן מסך פעיל: כ-{elapsed_now} דקות")
+        
         if col2.button("⏹️ עצור ועדכן יתרה"):
-            duration_mins = int((time.time() - st.session_state.start_time) / 60)
-            if duration_mins < 1: duration_mins = 1 # מינימום דקה
+            duration_mins = int((time.time() - start_time) / 60)
+            if duration_mins < 1: duration_mins = 1 
             data['screen_time'][user_select] -= duration_mins
+            del data["active_stopwatches"][user_select]
             save_data(data)
-            st.session_state.stopwatch_running = False
             st.success(f"נוצלו {duration_mins} דקות מהיתרה.")
             st.rerun()
 
     st.divider()
     
-    # עדכון ידני
     u_val = st.number_input("ניצול ידני (דקות):", min_value=0, step=1)
     if st.button("עדכן ניצול ידני"):
         data['screen_time'][user_select] -= u_val
@@ -152,7 +157,6 @@ if user_select:
 
 st.divider()
 
-# --- גרף אלופי הבית (משימות בית בלבד) ---
 st.subheader("🏆 אלופי משק הבית (היום)")
 home_counts = {u: 0 for u in USERS}
 for t in data.get("tasks_today", []):
@@ -169,7 +173,6 @@ for u, count in home_counts.items():
 chart_html += "</div>"
 st.markdown(chart_html, unsafe_allow_html=True)
 
-# --- סיכום פלא ---
 st.subheader("🦜 סיכום יומי - פלא התוכי")
 if st.button("הכן סיכום יומי עכשיו"):
     with st.spinner("פלא חושב..."):
