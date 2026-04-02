@@ -1,6 +1,7 @@
 import streamlit as st
 import json
 import os
+import time
 from datetime import datetime
 import google.generativeai as genai
 
@@ -22,13 +23,24 @@ TASKS_DB = {
 DATA_FILE = 'family_data.json'
 
 def load_data():
+    default_data = {"screen_time": {u: 0 for u in USERS}, "tasks_today": [], "compliments": [], "last_date": str(datetime.now().date())}
     if os.path.exists(DATA_FILE):
         try:
             with open(DATA_FILE, 'r', encoding='utf-8') as f:
-                return json.load(f)
+                saved_data = json.load(f)
+                # נוודא שזמן המסך נשמר גם אם יש שגיאה חלקית
+                if "screen_time" in saved_data:
+                    default_data["screen_time"] = saved_data["screen_time"]
+                if "tasks_today" in saved_data:
+                    default_data["tasks_today"] = saved_data["tasks_today"]
+                if "compliments" in saved_data:
+                    default_data["compliments"] = saved_data["compliments"]
+                if "last_date" in saved_data:
+                    default_data["last_date"] = saved_data["last_date"]
+                return default_data
         except:
             pass
-    return {"screen_time": {u: 0 for u in USERS}, "tasks_today": [], "compliments": [], "last_date": str(datetime.now().date())}
+    return default_data
 
 def save_data(d):
     with open(DATA_FILE, 'w', encoding='utf-8') as f:
@@ -36,6 +48,7 @@ def save_data(d):
 
 data = load_data()
 today_str = str(datetime.now().date())
+# איפוס משימות בלבד ביום חדש (זמן מסך ממשיך להצטבר לנצח)
 if data.get("last_date") != today_str:
     data["tasks_today"] = []
     data["compliments"] = []
@@ -53,7 +66,7 @@ if user_select:
     if st.button("עדכן ניצול זמן"):
         data['screen_time'][user_select] -= u_val
         save_data(data)
-        st.session_state.msg_time = "הזמן עודכן!"
+        st.session_state.msg_time = "הזמן עודכן בהצלחה!"
         st.rerun()
 
     if st.session_state.msg_time:
@@ -61,6 +74,21 @@ if user_select:
         st.session_state.msg_time = None
 
     st.divider()
+
+    # --- טיימר פתוח ---
+    st.subheader("⏱️ טיימר פתוח (לא קשור למשימות)")
+    timer_mins = st.number_input("הגדר דקות לטיימר:", min_value=1, step=1, value=15)
+    if st.button("התחל טיימר"):
+        timer_ph = st.empty()
+        for secs in range(timer_mins * 60, -1, -1):
+            mm, ss = divmod(secs, 60)
+            # תצוגה גדולה משמאל לימין לטובת השעון
+            timer_ph.markdown(f"<div style='text-align: center; font-size: 60px; color: #ff6b6b; font-weight: bold; direction: ltr; background: white; border-radius: 15px; padding: 10px; margin-bottom: 20px;'>{mm:02d}:{ss:02d}</div>", unsafe_allow_html=True)
+            time.sleep(1)
+        st.success("⏰ הזמן נגמר!")
+        st.balloons()
+    st.divider()
+
     st.subheader("🧹 דיווח על משימה")
     cat_display = st.radio("סוג משימה:", ["משימות אישיות", "משימות בית"], horizontal=True)
     cat_key = "personal" if cat_display == "משימות אישיות" else "home"
@@ -74,7 +102,7 @@ if user_select:
         if f_name:
             reward = TASKS_DB[cat_key].get(t_choice, 15)
             status = "approved" if role == "parent" else "pending"
-            data["tasks_today"].append({"user": user_select, "task": f_name, "reward": reward, "status": status})
+            data["tasks_today"].append({"user": user_select, "category": cat_key, "task": f_name, "reward": reward, "status": status})
             if role == "parent": data['screen_time'][user_select] += reward
             save_data(data)
             st.session_state.msg_task = "המשימה נרשמה!"
@@ -119,6 +147,28 @@ if user_select:
         st.session_state.msg_comp = None
 
 st.divider()
+
+# --- גרף משימות בית (אלופי משק הבית) ---
+st.subheader("🏆 אלופי משק הבית (היום)")
+home_counts = {u: 0 for u in USERS}
+for t in data.get("tasks_today", []):
+    # תמיכה לאחור בנתונים ישנים שאין בהם "קטגוריה", ע"י בדיקה מול מאגר משימות הבית
+    is_home = t.get("category") == "home" or t.get("task") in TASKS_DB["home"]
+    if t.get("status") == "approved" and is_home:
+        if t["user"] in home_counts:
+            home_counts[t["user"]] += 1
+
+max_tasks = max(home_counts.values()) if home_counts else 0
+
+chart_html = "<div style='display: flex; justify-content: space-around; align-items: flex-end; height: 200px; background: white; border-radius: 20px; padding: 20px; box-shadow: 0 4px 6px rgba(0,0,0,0.1); margin-bottom: 20px;'>"
+for u, count in home_counts.items():
+    crown = "👑" if count == max_tasks and max_tasks > 0 else "&nbsp;"
+    height = int((count / max_tasks) * 120) if max_tasks > 0 else 5
+    chart_html += f"<div style='text-align: center;'><div style='font-size:26px; margin-bottom: 5px;'>{crown}</div><div style='height: {height}px; width: 45px; background-color: #38b000; margin: 0 auto; border-radius: 5px 5px 0 0; display:flex; align-items:flex-end; justify-content:center; color:white; font-weight:bold; padding-bottom:5px;'>{count if count>0 else ''}</div><div style='margin-top:10px; font-weight:bold; color: #333;'>{u}</div></div>"
+chart_html += "</div>"
+st.markdown(chart_html, unsafe_allow_html=True)
+
+# --- סיכום פלא התוכי ---
 st.subheader("🦜 סיכום יומי - פלא התוכי")
 if st.button("הכן סיכום יומי עכשיו"):
     with st.spinner("פלא חושב..."):
