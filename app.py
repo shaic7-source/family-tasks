@@ -89,4 +89,64 @@ if "time_update_april_2026" not in data.get("updates_applied", []):
     data["screen_time"]["טנא"] += 720
     data["screen_time"]["בארי"] += 300
     if "updates_applied" not in data: data["updates_applied"] = []
-    data["updates_applied"].append("time
+    data["updates_applied"].append("time_update_april_2026")
+    save_data(data)
+
+today_str = str(datetime.now().date())
+if data.get("last_date") != today_str:
+    data["tasks_today"] = []
+    data["compliments"] = []
+    data["last_date"] = today_str
+    save_data(data)
+
+st.title("🏡 משימות משפחת פלא")
+user_select = st.selectbox("מי המשתמש?", [""] + list(USERS.keys()))
+
+if user_select:
+    role = USERS[user_select]
+    st.subheader(f"שלום {user_select}! 🦜 יתרה: {data['screen_time'][user_select]} דקות")
+
+    # --- סטופר מבוסס ענן למניעת איפוס ביציאה מהאפליקציה ---
+    st.subheader("⏱️ סטופר זמן מסך")
+    col1, col2 = st.columns(2)
+    
+    active_watches = data.get("active_stopwatches", {})
+    
+    if user_select not in active_watches:
+        if col1.button("▶️ התחל זמן מסך"):
+            if "active_stopwatches" not in data: data["active_stopwatches"] = {}
+            data["active_stopwatches"][user_select] = time.time()
+            save_data(data)
+            st.rerun()
+    else:
+        start_time = active_watches[user_select]
+        elapsed_now = int((time.time() - start_time) / 60)
+        st.warning(f"זמן מסך פעיל: כ-{elapsed_now} דקות")
+        
+        if col2.button("⏹️ עצור ועדכן יתרה"):
+            duration_mins = int((time.time() - start_time) / 60)
+            if duration_mins < 1: duration_mins = 1 
+            data['screen_time'][user_select] -= duration_mins
+            del data["active_stopwatches"][user_select]
+            save_data(data)
+            st.success(f"נוצלו {duration_mins} דקות מהיתרה.")
+            st.rerun()
+
+    st.divider()
+    
+    u_val = st.number_input("ניצול ידני (דקות):", min_value=0, step=1)
+    if st.button("עדכן ניצול ידני"):
+        data['screen_time'][user_select] -= u_val
+        save_data(data)
+        st.session_state.msg_time = "הזמן עודכן!"
+        st.rerun()
+
+    if st.session_state.msg_time:
+        st.success(st.session_state.msg_time); st.session_state.msg_time = None
+
+    st.divider()
+    st.subheader("🧹 דיווח על משימה")
+    cat_display = st.radio("סוג משימה:", ["משימות אישיות", "משימות בית"], horizontal=True)
+    cat_key = "personal" if cat_display == "משימות אישיות" else "home"
+    t_list = list(TASKS_DB[cat_key].keys()) + ["אחר"]
+    t_choice = st.selectbox("בחר משימה:", t_
