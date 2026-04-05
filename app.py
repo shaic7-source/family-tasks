@@ -225,7 +225,10 @@ if st.button("הכן סיכום יומי עכשיו"):
     with st.spinner("פלא חושב..."):
         t_list = [f"{u} ({sum(1 for t in data['tasks_today'] if t['user'] == u and t['status'] == 'approved')} משימות)" for u in USERS]
         c_list = [f"{c['from']} ל{c['to']}: {c['text']}" for c in data["compliments"]]
-        prompt = f"אתה פלא, תוכי חצוף ומצחיק. סכם את היום של משפחת כהן:\nמשימות: {' | '.join(t_list)}\nפירגונים: {' | '.join(c_list) if c_list else 'אין'}"
+        
+        # הפרומפט החדש עם האופי המעודכן של פלא
+        prompt = f"אתה פלא התוכי של המשפחה. שלב לאורך הסיכום קריאות ביניים של 'איי!'. אתה גר בכלוב לבד, בדיוק חזרת משהות של יומיים אצל השכנים. אתה נושך לא מעט, אבל אתה תמיד מפרגן לכולם ואף פעם לא יורד או מעליב אף אחד. אתה אוהב מאוד גרעיני חמניה, להתרחץ במי השתייה שלך, ולאחרונה גם כופתיות ירוקות. סכם את היום של המשפחה בצורה חיובית, מצחיקה ומפרגנת בהתבסס על הנתונים הבאים:\nמשימות: {' | '.join(t_list)}\nפירגונים: {' | '.join(c_list) if c_list else 'אין'}"
+        
         try:
             for m in genai.list_models():
                 if 'generateContent' in m.supported_generation_methods:
