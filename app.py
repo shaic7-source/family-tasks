@@ -73,9 +73,11 @@ def load_data():
             with open(DATA_FILE, 'r', encoding='utf-8') as f:
                 saved = json.load(f)
                 for key in default_data:
-                    if key in saved: default_data[key] = saved[key]
+                    if key in saved: 
+                        default_data[key] = saved[key]
                 return default_data
-        except: pass
+        except: 
+            pass
     return default_data
 
 def save_data(d):
@@ -88,7 +90,8 @@ data = load_data()
 if "time_update_april_2026" not in data.get("updates_applied", []):
     data["screen_time"]["טנא"] += 720
     data["screen_time"]["בארי"] += 300
-    if "updates_applied" not in data: data["updates_applied"] = []
+    if "updates_applied" not in data: 
+        data["updates_applied"] = []
     data["updates_applied"].append("time_update_april_2026")
     save_data(data)
 
@@ -114,7 +117,8 @@ if user_select:
     
     if user_select not in active_watches:
         if col1.button("▶️ התחל זמן מסך"):
-            if "active_stopwatches" not in data: data["active_stopwatches"] = {}
+            if "active_stopwatches" not in data: 
+                data["active_stopwatches"] = {}
             data["active_stopwatches"][user_select] = time.time()
             save_data(data)
             st.rerun()
@@ -125,7 +129,8 @@ if user_select:
         
         if col2.button("⏹️ עצור ועדכן יתרה"):
             duration_mins = int((time.time() - start_time) / 60)
-            if duration_mins < 1: duration_mins = 1 
+            if duration_mins < 1: 
+                duration_mins = 1 
             data['screen_time'][user_select] -= duration_mins
             del data["active_stopwatches"][user_select]
             save_data(data)
@@ -142,11 +147,19 @@ if user_select:
         st.rerun()
 
     if st.session_state.msg_time:
-        st.success(st.session_state.msg_time); st.session_state.msg_time = None
+        st.success(st.session_state.msg_time)
+        st.session_state.msg_time = None
 
     st.divider()
     st.subheader("🧹 דיווח על משימה")
     cat_display = st.radio("סוג משימה:", ["משימות אישיות", "משימות בית"], horizontal=True)
     cat_key = "personal" if cat_display == "משימות אישיות" else "home"
     t_list = list(TASKS_DB[cat_key].keys()) + ["אחר"]
-    t_choice = st.selectbox("בחר משימה:", t_
+    t_choice = st.selectbox("בחר משימה:", t_list)
+    c_name = st.text_input("שם המשימה:") if t_choice == "אחר" else ""
+
+    if st.button("סיימתי! ✨"):
+        f_name = c_name if t_choice == "אחר" else t_choice
+        if f_name:
+            reward = TASKS_DB[cat_key].get(t_choice, 15)
+            status = "approved" if role == "parent" else "pending"
