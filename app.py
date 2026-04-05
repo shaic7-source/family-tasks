@@ -13,7 +13,7 @@ for k in ['msg_time', 'msg_task', 'msg_approve', 'msg_comp']:
     if k not in st.session_state:
         st.session_state[k] = None
 
-st.markdown("<style>.stApp{background: linear-gradient(135deg, #d1e8e2, #fffd8d, #ffc8dd, #90e0ef); direction: rtl;} p,div,span,h1,h2,h3,h4,h5,h6,label,input,textarea{text-align: right !important; direction: rtl !important;} .stButton>button{background-color: #ff9f43; color: white; border-radius: 20px; width: 100%; font-weight: bold; height: 3.5rem; border: none;} .pele-summary{background: white; padding: 20px; border-radius: 20px; border: 5px solid #ff6b6b; color: #333; margin-top: 20px;}</style>", unsafe_allow_html=True)
+st.markdown("<style>.stApp{background: linear-gradient(135deg, #d1e8e2, #fffd8d, #ffc8dd, #90e0ef); direction: rtl; color: black;} p,div,span,h1,h2,h3,h4,h5,h6,label,input,textarea{text-align: right !important; direction: rtl !important; color: black !important;} .stButton>button{background-color: #ff9f43; color: white !important; border-radius: 20px; width: 100%; font-weight: bold; height: 3.5rem; border: none;} .pele-summary{background: white; padding: 20px; border-radius: 20px; border: 5px solid #ff6b6b; color: #333 !important; margin-top: 20px;}</style>", unsafe_allow_html=True)
 
 USERS = {"שי": "parent", "ענבל": "parent", "בארי": "child", "טנא": "child"}
 TASKS_DB = {
@@ -169,7 +169,7 @@ for u, count in home_counts.items():
     is_winner = (count == max_val and max_val > 0)
     crown = "👑" if is_winner else "&nbsp;"
     h = int((count / max_val) * 100) if max_val > 0 else 5
-    chart_html += f"<div style='text-align: center;'><div style='font-size:20px;'>{crown}</div><div style='height: {h}px; width: 40px; background-color: #38b000; margin: 0 auto; border-radius: 5px 5px 0 0; display:flex; align-items:flex-end; justify-content:center; color:white; font-size:12px;'>{count if count>0 else ''}</div><div style='margin-top:5px; font-size:14px;'>{u}</div></div>"
+    chart_html += f"<div style='text-align: center;'><div style='font-size:20px;'>{crown}</div><div style='height: {h}px; width: 40px; background-color: #38b000; margin: 0 auto; border-radius: 5px 5px 0 0; display:flex; align-items:flex-end; justify-content:center; color:white !important; font-size:12px;'>{count if count>0 else ''}</div><div style='margin-top:5px; font-size:14px; color:black !important;'>{u}</div></div>"
 chart_html += "</div>"
 st.markdown(chart_html, unsafe_allow_html=True)
 
