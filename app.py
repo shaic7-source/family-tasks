@@ -9,11 +9,12 @@ import google.generativeai as genai
 GEMINI_API_KEY = st.secrets["GEMINI_API_KEY"]
 genai.configure(api_key=GEMINI_API_KEY)
 
+# אתחול Session State
 for k in ['msg_time', 'msg_task', 'msg_approve', 'msg_comp']:
     if k not in st.session_state:
         st.session_state[k] = None
 
-# עדכון העיצוב לתיקון רקע וטקסט בתיבות בחירה
+# עיצוב CSS
 st.markdown("""
 <style>
 .stApp {
@@ -25,7 +26,6 @@ p, div, span, h1, h2, h3, h4, h5, h6, label {
     direction: rtl !important; 
     color: black !important;
 }
-/* כפיית רקע לבן וטקסט שחור על תיבות קלט ורשימות בחירה נפתחות */
 input, textarea, div[data-baseweb="select"] > div, ul[role="listbox"], li[role="option"] {
     background-color: white !important; 
     color: black !important;
@@ -41,13 +41,12 @@ input, textarea, div[data-baseweb="select"] > div, ul[role="listbox"], li[role="
     height: 3.5rem; 
     border: none;
 }
-.pele-summary {
+.task-card {
     background: white; 
-    padding: 20px; 
-    border-radius: 20px; 
-    border: 5px solid #ff6b6b; 
-    color: #333 !important; 
-    margin-top: 20px;
+    padding: 15px; 
+    border-radius: 15px; 
+    border-right: 10px solid #ff6b6b; 
+    margin-bottom: 10px;
 }
 </style>
 """, unsafe_allow_html=True)
@@ -86,15 +85,15 @@ def save_data(d):
 
 data = load_data()
 
-# עדכון יתרות חד-פעמי (12 שעות לטנא, 5 שעות לבארי)
+# עדכון יתרות חד-פעמי
 if "time_update_april_2026" not in data.get("updates_applied", []):
     data["screen_time"]["טנא"] += 720
     data["screen_time"]["בארי"] += 300
-    if "updates_applied" not in data: 
-        data["updates_applied"] = []
+    if "updates_applied" not in data: data["updates_applied"] = []
     data["updates_applied"].append("time_update_april_2026")
     save_data(data)
 
+# איפוס יומי
 today_str = str(datetime.now().date())
 if data.get("last_date") != today_str:
     data["tasks_today"] = []
@@ -109,57 +108,22 @@ if user_select:
     role = USERS[user_select]
     st.subheader(f"שלום {user_select}! 🦜 יתרה: {data['screen_time'][user_select]} דקות")
 
-    # --- סטופר מבוסס ענן למניעת איפוס ביציאה מהאפליקציה ---
+    # --- סטופר ---
     st.subheader("⏱️ סטופר זמן מסך")
     col1, col2 = st.columns(2)
-    
     active_watches = data.get("active_stopwatches", {})
     
     if user_select not in active_watches:
         if col1.button("▶️ התחל זמן מסך"):
-            if "active_stopwatches" not in data: 
-                data["active_stopwatches"] = {}
-            data["active_stopwatches"][user_select] = time.time()
+            data.setdefault("active_stopwatches", {})[user_select] = time.time()
             save_data(data)
             st.rerun()
     else:
         start_time = active_watches[user_select]
         elapsed_now = int((time.time() - start_time) / 60)
         st.warning(f"זמן מסך פעיל: כ-{elapsed_now} דקות")
-        
-        if col2.button("⏹️ עצור ועדכן יתרה"):
-            duration_mins = int((time.time() - start_time) / 60)
-            if duration_mins < 1: 
-                duration_mins = 1 
+        if col2.button("⏹️ עצור ועדכן"):
+            duration_mins = max(1, int((time.time() - start_time) / 60))
             data['screen_time'][user_select] -= duration_mins
             del data["active_stopwatches"][user_select]
             save_data(data)
-            st.success(f"נוצלו {duration_mins} דקות מהיתרה.")
-            st.rerun()
-
-    st.divider()
-    
-    u_val = st.number_input("ניצול ידני (דקות):", min_value=0, step=1)
-    if st.button("עדכן ניצול ידני"):
-        data['screen_time'][user_select] -= u_val
-        save_data(data)
-        st.session_state.msg_time = "הזמן עודכן!"
-        st.rerun()
-
-    if st.session_state.msg_time:
-        st.success(st.session_state.msg_time)
-        st.session_state.msg_time = None
-
-    st.divider()
-    st.subheader("🧹 דיווח על משימה")
-    cat_display = st.radio("סוג משימה:", ["משימות אישיות", "משימות בית"], horizontal=True)
-    cat_key = "personal" if cat_display == "משימות אישיות" else "home"
-    t_list = list(TASKS_DB[cat_key].keys()) + ["אחר"]
-    t_choice = st.selectbox("בחר משימה:", t_list)
-    c_name = st.text_input("שם המשימה:") if t_choice == "אחר" else ""
-
-    if st.button("סיימתי! ✨"):
-        f_name = c_name if t_choice == "אחר" else t_choice
-        if f_name:
-            reward = TASKS_DB[cat_key].get(t_choice, 15)
-            status = "approved" if role == "parent" else "pending"
