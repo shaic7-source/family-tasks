@@ -101,4 +101,116 @@ def load_data():
                 for key in default_data:
                     if key in saved: default_data[key] = saved[key]
                 return default_data
-        except: return default_
+        except: return default_data
+    return default_data
+
+def save_data(d):
+    with open(DATA_FILE, 'w', encoding='utf-8') as f:
+        json.dump(d, f, ensure_ascii=False, indent=4)
+
+data = load_data()
+
+# איפוס יומי
+today_str = str(datetime.now().date())
+if data.get("last_date") != today_str:
+    data["tasks_today"] = []
+    data["last_date"] = today_str
+    save_data(data)
+
+st.title("🏡 משימות משפחת פלא")
+user_select = st.selectbox("מי המשתמש?", [""] + list(USERS.keys()))
+
+if user_select:
+    role = USERS[user_select]
+    st.subheader(f"שלום {user_select}! 🦜 יתרה: {data['screen_time'].get(user_select, 0)} דקות")
+
+    # הצגת תגובה מפלא אם קיימת
+    if st.session_state.msg_pele:
+        st.markdown(f"""<div class="pele-card"><b>🦜 פלא אומר:</b><br>{st.session_state.msg_pele}</div>""", unsafe_allow_html=True)
+        if st.button("תודה פלא!"):
+            st.session_state.msg_pele = None
+            st.rerun()
+
+    # --- סטופר ---
+    st.subheader("⏱️ סטופר זמן מסך")
+    col1, col2 = st.columns(2)
+    active_watches = data.setdefault("active_stopwatches", {})
+    
+    if user_select not in active_watches:
+        if col1.button("▶️ התחל זמן מסך"):
+            data["active_stopwatches"][user_select] = time.time()
+            save_data(data)
+            st.rerun()
+    else:
+        elapsed = int((time.time() - active_watches[user_select]) / 60)
+        st.warning(f"זמן מסך פעיל: {elapsed} דקות")
+        if col2.button("⏹️ עצור ועדכן"):
+            data['screen_time'][user_select] -= max(1, elapsed)
+            data["active_stopwatches"].pop(user_select, None)
+            save_data(data)
+            st.rerun()
+
+    st.divider()
+    
+    # --- דיווח משימות ---
+    st.subheader("🧹 דיווח על משימה")
+    cat_display = st.radio("סוג משימה:", ["משימות אישיות", "משימות בית"], horizontal=True)
+    cat_key = "personal" if cat_display == "משימות אישיות" else "home"
+    t_list = list(TASKS_DB[cat_key].keys()) + ["אחר"]
+    t_choice = st.selectbox("בחר משימה:", t_list)
+    c_name = st.text_input("שם המשימה:") if t_choice == "אחר" else ""
+
+    if st.button("סיימתי! ✨"):
+        f_name = c_name if t_choice == "אחר" else t_choice
+        if f_name:
+            reward = TASKS_DB[cat_key].get(t_choice, 15)
+            status = "approved" if role == "parent" else "pending"
+            
+            new_task = {
+                "id": time.time(), "user": user_select, "task": f_name,
+                "reward": reward, "status": status, "time": datetime.now().strftime("%H:%M")
+            }
+            data["tasks_today"].append(new_task)
+            
+            if status == "approved":
+                data['screen_time'][user_select] += reward
+                st.session_state.msg_pele = generate_pele_response(user_select, f_name)
+            
+            save_data(data)
+            st.rerun()
+
+    st.divider()
+
+    # --- אישור משימות (הורים) ---
+    if role == "parent":
+        st.subheader("📋 אישור משימות ילדים")
+        pending = [t for t in data["tasks_today"] if t.get("status") == "pending"]
+        
+        if not pending:
+            st.info("אין משימות הממתינות לאישור.")
+            
+        for task in pending:
+            with st.container():
+                st.markdown(f'<div class="task-card"><b>{task["user"]}</b>: {task["task"]} ({task["reward"]} דק\')</div>', unsafe_allow_html=True)
+                c_aprv, c_rej = st.columns(2)
+                
+                if c_aprv.button(f"✅ אשר ל{task['user']}", key=f"aprv_{task['id']}"):
+                    for t in data["tasks_today"]:
+                        if t.get("id") == task["id"]: t["status"] = "approved"
+                    data["screen_time"][task["user"]] += task["reward"]
+                    st.session_state.msg_pele = generate_pele_response(task["user"], task["task"])
+                    save_data(data)
+                    st.rerun()
+                
+                if c_rej.button(f"❌ אל תאשר", key=f"rej_{task['id']}"):
+                    # הסרת המשימה מהרשימה
+                    data["tasks_today"] = [t for t in data["tasks_today"] if t.get("id") != task["id"]]
+                    save_data(data)
+                    st.rerun()
+
+    # --- היסטוריה יומית ---
+    st.subheader("✅ מה עשינו היום")
+    if not data["tasks_today"]:
+        st.write("עוד לא בוצעו משימות היום.")
+    for t in data["tasks_today"]:
+        st.write(f"{'✔️' if t['status']=='approved' else '⏳'} {t['user']}: {t['task']}")
