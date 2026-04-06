@@ -35,10 +35,6 @@ p, div, span, h1, h2, h3, h4, h5, h6, label {
     font-weight: bold; 
     height: 3.5rem;
 }
-/* כפתור ביטול אדום */
-.stButton>button[kind="secondary"] {
-    background-color: #ff6b6b !important;
-}
 .pele-card {
     background: #fff3cd; 
     padding: 20px; 
@@ -60,7 +56,7 @@ p, div, span, h1, h2, h3, h4, h5, h6, label {
 
 USERS = {"שי": "parent", "ענבל": "parent", "בארי": "child", "טנא": "child"}
 TASKS_DB = {
-    "personal": {"ספורט": 10, "עבודה": 10, "קריאה": 10, "תפילה": 10},
+    "personal": {"ספורט": 10, "עבודה": 10, "קריאה": 10},
     "home": {"מדיח": 15, "ניקוי שיש": 15, "כביסה": 15, "טאטוא בית": 15, "פינוי זבל": 15, "בישול": 15, "סידור חדר": 15}
 }
 DATA_FILE = 'family_data.json'
@@ -84,7 +80,7 @@ def generate_pele_response(name, task_name):
         response = model.generate_content(prompt)
         return response.text
     except:
-        return f"כל הכבוד {name}! אני בדיוק מנסה ללמד את הכף שלי לשחות. בדיחה: מה עושה עץ שרוצה ללכת? שורש!"
+        return f"כל הכבוד {name}! אני בדיוק מנסה ללמד את הכרית שלי לעשות סלטה. בדיחה: מה עושה עץ שרוצה ללכת? שורש!"
 
 def load_data():
     default_data = {
@@ -185,32 +181,18 @@ if user_select:
     if role == "parent":
         st.subheader("📋 אישור משימות ילדים")
         pending = [t for t in data["tasks_today"] if t.get("status") == "pending"]
-        
-        if not pending:
-            st.info("אין משימות הממתינות לאישור.")
-            
         for task in pending:
             with st.container():
-                st.markdown(f'<div class="task-card"><b>{task["user"]}</b>: {task["task"]} ({task["reward"]} דק\')</div>', unsafe_allow_html=True)
-                c_aprv, c_rej = st.columns(2)
-                
-                if c_aprv.button(f"✅ אשר ל{task['user']}", key=f"aprv_{task['id']}"):
+                st.markdown(f'<div class="task-card"><b>{task["user"]}</b>: {task["task"]}</div>', unsafe_allow_html=True)
+                if st.button(f"אשר ל{task['user']}", key=f"aprv_{task['id']}"):
                     for t in data["tasks_today"]:
                         if t.get("id") == task["id"]: t["status"] = "approved"
                     data["screen_time"][task["user"]] += task["reward"]
                     st.session_state.msg_pele = generate_pele_response(task["user"], task["task"])
                     save_data(data)
                     st.rerun()
-                
-                if c_rej.button(f"❌ אל תאשר", key=f"rej_{task['id']}"):
-                    # הסרת המשימה מהרשימה
-                    data["tasks_today"] = [t for t in data["tasks_today"] if t.get("id") != task["id"]]
-                    save_data(data)
-                    st.rerun()
 
     # --- היסטוריה יומית ---
     st.subheader("✅ מה עשינו היום")
-    if not data["tasks_today"]:
-        st.write("עוד לא בוצעו משימות היום.")
     for t in data["tasks_today"]:
         st.write(f"{'✔️' if t['status']=='approved' else '⏳'} {t['user']}: {t['task']}")
