@@ -3,6 +3,12 @@ import json
 import os
 import time
 from datetime import datetime
+import google.generativeai as genai
+
+# הגדרות API (לצורך מחמאות יצירתיות)
+if "GEMINI_API_KEY" in st.secrets:
+    genai.configure(api_key=st.secrets["GEMINI_API_KEY"])
+    model = genai.GenerativeModel('gemini-1.5-flash')
 
 # אתחול Session State
 for k in ['msg_time', 'msg_task', 'msg_approve']:
@@ -45,6 +51,21 @@ TASKS_DB = {
     "home": {"מדיח": 15, "ניקוי שיש": 15, "כביסה": 15, "טאטוא בית": 15, "פינוי זבל": 15, "בישול": 15, "סידור חדר": 15}
 }
 DATA_FILE = 'family_data.json'
+
+def generate_pele_compliment(name, task_name):
+    """מחולל מחמאה יצירתית בלבד מפלא התוכי"""
+    role_desc = "אבא" if name == "שי" else "אמא" if name == "ענבל" else "ילד" if name == "בארי" else "ילדה בת 9"
+    prompt = f"""
+    אתה 'פלא', תוכי חכם ומעודד. המשתמש {name} (שהוא {role_desc}) סיים את המשימה: {task_name}.
+    כתוב מחמאה אחת קצרה, יצירתית ומקורית מאוד (משפט אחד או שניים).
+    אל תספר בדיחות, אל תדבר על תחביבים ואל תזכיר שכנים. רק מחמאה מפרגנת שתעשה לו/לה חיוך.
+    פנה ל{name} בצורה מתאימה (זכר/נקבה). טון: חביב וענייני.
+    """
+    try:
+        response = model.generate_content(prompt)
+        return response.text.strip()
+    except:
+        return f"{name}, ביצוע מושלם! הבית נראה טוב יותר בזכותך."
 
 def load_data():
     default_data = {
@@ -125,10 +146,23 @@ if user_select:
             }
             data["tasks_today"].append(new_task)
             
+            # יצירת המחמאה של פלא
+            compliment = generate_pele_compliment(user_select, f_name)
+            
             if status == "approved":
                 data['screen_time'][user_select] += reward
+                st.session_state.msg_task = f"✅ המשימה נרשמה! 🦜 פלא אומר: {compliment}"
+            else:
+                st.session_state.msg_task = f"⏳ המשימה נשלחה לאישור ההורים. 🦜 פלא אומר: {compliment}"
             
             save_data(data)
+            st.rerun()
+
+    # הצגת הפידבק בצמוד ללחצן
+    if st.session_state.msg_task:
+        st.success(st.session_state.msg_task)
+        if st.button("הבנתי, תודה!"):
+            st.session_state.msg_task = None
             st.rerun()
 
     st.divider()
