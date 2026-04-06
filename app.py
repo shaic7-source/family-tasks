@@ -42,6 +42,15 @@ p, div, span, h1, h2, h3, h4, h5, h6, label {
     border-right: 10px solid #ff6b6b; 
     margin-bottom: 10px;
 }
+.pele-speech {
+    background: #fff3cd;
+    border: 2px solid #ff9f43;
+    padding: 15px;
+    border-radius: 15px;
+    margin: 10px 0;
+    font-size: 1.2rem;
+    font-weight: 500;
+}
 </style>
 """, unsafe_allow_html=True)
 
@@ -53,30 +62,31 @@ TASKS_DB = {
 DATA_FILE = 'family_data.json'
 
 def generate_pele_compliment(name, task_name):
-    """מחולל מחמאה יצירתית ורלוונטית למשימה"""
+    """מחולל מחמאה חופשית ויצירתית במיוחד"""
     role_desc = "אבא" if name == "שי" else "אמא" if name == "ענבל" else "ילד" if name == "בארי" else "ילדה בת 9"
     
-    # הנחיות ספציפיות לפי סוג משימה
     prompt = f"""
-    אתה 'פלא', תוכי חכם ומעודד שחי עם משפחת פלא.
+    אתה 'פלא', תוכי צבעוני, חכם, קצת פילוסוף ומאוד מפרגן. 
     המשתמש {name} (שהוא {role_desc}) סיים את המשימה: {task_name}.
     
-    המשימה שלך: כתוב מחמאה קצרה (משפט או שניים) שחייבת להיות רלוונטית לתוכן המשימה!
-    - אם זו 'תפילה': התמקד בכוונה, בנחת רוח או בחיבור.
-    - אם זו משימת ניקיון: התמקד בברק של הבית ובסדר.
-    - אם זו משימת ספורט: התמקד באנרגיה ובבריאות.
-    - אם זו קריאה/עבודה: התמקד בחכמה ובריכוז.
-    
+    המשימה שלך: כתוב מחמאה יצירתית, ציורית ומקורית (1-2 משפטים). 
+    קח חופש אומנותי מלא! 
+    - אם זו תפילה: דבר על האור, על השקט הפנימי, על המילים שעולות למעלה.
+    - אם זו משימת בית: דבר על הבית שמרגיש פתאום כמו ארמון, על הקסם שבידיים שלהם.
+    - אם זה ספורט: דבר על כוח של נמר, על אנרגיה שמתפרצת.
+    - אם זו טנא בת ה-9: תהיה קצת קסום ומחזק. 
+    - אם זה שי האבא: תהיה מעריך ומלא כבוד.
+
     דגשים:
-    - אל תשתמש במחמאות גנריות שלא קשורות למעשה.
-    - פנה ל{name} בצורה מתאימה (זכר/נקבה).
-    - טון: חביב, ענייני, מעט הומוריסטי אבל מכבד.
+    - אל תהיה בנאלי. אל תגיד רק "כל הכבוד".
+    - השתמש בדימויים (כמו: "הנוצות שלי רועדות מהתרגשות", "צבעת את הבית בצבעים של נחת").
+    - פנה במין הנכון.
     """
     try:
         response = model.generate_content(prompt)
         return response.text.strip()
     except:
-        return f"כל הכבוד {name} על ביצוע משימת {task_name}!"
+        return f"{name}, אתה פשוט פלא! המשימה {task_name} בוצעה בסטייל."
 
 def load_data():
     default_data = {
@@ -151,7 +161,7 @@ if user_select:
             reward = TASKS_DB[cat_key].get(t_choice, 15)
             status = "approved" if role == "parent" else "pending"
             
-            # יצירת המחמאה הרלוונטית
+            # ג'נרוט המחמאה של פלא
             compliment = generate_pele_compliment(user_select, f_name)
             
             new_task = {
@@ -162,16 +172,15 @@ if user_select:
             
             if status == "approved":
                 data['screen_time'][user_select] += reward
-                st.session_state.msg_task = f"✅ המשימה נרשמה! 🦜 פלא: {compliment}"
-            else:
-                st.session_state.msg_task = f"⏳ נשלח לאישור הורים. 🦜 פלא: {compliment}"
             
+            st.session_state.msg_task = compliment
             save_data(data)
             st.rerun()
 
+    # תצוגת המחמאה של פלא
     if st.session_state.msg_task:
-        st.success(st.session_state.msg_task)
-        if st.button("הבנתי!"):
+        st.markdown(f"""<div class="pele-speech"><b>🦜 פלא אומר:</b><br>{st.session_state.msg_task}</div>""", unsafe_allow_html=True)
+        if st.button("תודה פלא!"):
             st.session_state.msg_task = None
             st.rerun()
 
@@ -201,8 +210,3 @@ if user_select:
                     data["tasks_today"] = [t for t in data["tasks_today"] if t.get("id") != task["id"]]
                     save_data(data)
                     st.rerun()
-
-    # --- היסטוריה יומית ---
-    st.subheader("✅ מה עשינו היום")
-    for t in data["tasks_today"]:
-        st.write(f"{'✔️' if t['status']=='approved' else '⏳'} {t['user']}: {t['task']}")
