@@ -3,15 +3,14 @@ import json
 import os
 import time
 from datetime import datetime
-import google.generativeai as genai
 
-# הגדרות API
+# הגדרות API (בדיקה שקיים לפני הגדרה)
 if "GEMINI_API_KEY" in st.secrets:
+    import google.generativeai as genai
     genai.configure(api_key=st.secrets["GEMINI_API_KEY"])
-    model = genai.GenerativeModel('gemini-1.5-flash')
 
-# אתחול Session State
-for k in ['msg_time', 'msg_task', 'msg_approve', 'msg_pele']:
+# אתחול Session State להודעות
+for k in ['msg_time', 'msg_task', 'msg_approve', 'msg_comp']:
     if k not in st.session_state:
         st.session_state[k] = None
 
@@ -27,6 +26,10 @@ p, div, span, h1, h2, h3, h4, h5, h6, label {
     direction: rtl !important; 
     color: black !important;
 }
+input, textarea, div[data-baseweb="select"] > div, ul[role="listbox"], li[role="option"] {
+    background-color: white !important; 
+    color: black !important;
+}
 .stButton>button {
     background-color: #ff9f43 !important; 
     color: white !important; 
@@ -35,21 +38,13 @@ p, div, span, h1, h2, h3, h4, h5, h6, label {
     font-weight: bold; 
     height: 3.5rem;
 }
-.pele-card {
-    background: #fff3cd; 
-    padding: 20px; 
-    border-radius: 20px; 
-    border: 3px dashed #ff9f43; 
-    margin: 20px 0;
-    color: #856404;
-    font-size: 1.1rem;
-}
 .task-card {
     background: white; 
     padding: 15px; 
     border-radius: 15px; 
     border-right: 10px solid #ff6b6b; 
     margin-bottom: 10px;
+    color: #333;
 }
 </style>
 """, unsafe_allow_html=True)
@@ -61,31 +56,11 @@ TASKS_DB = {
 }
 DATA_FILE = 'family_data.json'
 
-def generate_pele_response(name, task_name):
-    """מחולל תגובה יצירתית מפלא התוכי"""
-    role_desc = "אבא" if name == "שי" else "אמא" if name == "ענבל" else "ילד" if name == "בארי" else "ילדה בת 9"
-    prompt = f"""
-    אתה 'פלא', תוכי חכם, מצחיק ומעודד שחי עם משפחת פלא.
-    המשתמש {name} (שהוא {role_desc}) סיים הרגע את המשימה: {task_name}.
-    כתוב תגובה קצרה (2-3 משפטים) הכוללת:
-    1. מחמאה יצירתית ומקורית מאוד.
-    2. פרט מצחיק על תחביב חדש שהמצאת לעצמך (למשל: איסוף כפיות, לימוד שחמט לנמלים).
-    3. בדיחת קרש קצרה שמתאימה לילדים.
-    דגשים חשובים:
-    - אל תזכיר חזרה מהשכנים.
-    - פנה ל{name} בצורה מתאימה (זכר/נקבה/גיל).
-    - טון דיבור: חביב, ענייני ולא מתלהם.
-    """
-    try:
-        response = model.generate_content(prompt)
-        return response.text
-    except:
-        return f"כל הכבוד {name}! אני בדיוק מנסה ללמד את הכרית שלי לעשות סלטה. בדיחה: מה עושה עץ שרוצה ללכת? שורש!"
-
 def load_data():
     default_data = {
         "screen_time": {u: 0 for u in USERS}, 
         "tasks_today": [], 
+        "compliments": [], 
         "last_date": str(datetime.now().date()), 
         "updates_applied": [],
         "active_stopwatches": {} 
@@ -94,22 +69,36 @@ def load_data():
         try:
             with open(DATA_FILE, 'r', encoding='utf-8') as f:
                 saved = json.load(f)
+                # מיזוג נתונים כדי לוודא שכל המפתחות קיימים
                 for key in default_data:
-                    if key in saved: default_data[key] = saved[key]
+                    if key in saved: 
+                        default_data[key] = saved[key]
                 return default_data
-        except: return default_data
+        except: 
+            return default_data
     return default_data
 
 def save_data(d):
     with open(DATA_FILE, 'w', encoding='utf-8') as f:
         json.dump(d, f, ensure_ascii=False, indent=4)
 
+# טעינה ואימות מפתחות קריטיים
 data = load_data()
+if "active_stopwatches" not in data: data["active_stopwatches"] = {}
+if "tasks_today" not in data: data["tasks_today"] = []
+
+# עדכון יתרות חד-פעמי
+if "time_update_april_2026" not in data.get("updates_applied", []):
+    for u, amt in [("טנא", 720), ("בארי", 300)]:
+        data["screen_time"][u] = data["screen_time"].get(u, 0) + amt
+    data.setdefault("updates_applied", []).append("time_update_april_2026")
+    save_data(data)
 
 # איפוס יומי
 today_str = str(datetime.now().date())
 if data.get("last_date") != today_str:
     data["tasks_today"] = []
+    data["compliments"] = []
     data["last_date"] = today_str
     save_data(data)
 
@@ -118,19 +107,13 @@ user_select = st.selectbox("מי המשתמש?", [""] + list(USERS.keys()))
 
 if user_select:
     role = USERS[user_select]
-    st.subheader(f"שלום {user_select}! 🦜 יתרה: {data['screen_time'].get(user_select, 0)} דקות")
-
-    # הצגת תגובה מפלא אם קיימת
-    if st.session_state.msg_pele:
-        st.markdown(f"""<div class="pele-card"><b>🦜 פלא אומר:</b><br>{st.session_state.msg_pele}</div>""", unsafe_allow_html=True)
-        if st.button("תודה פלא!"):
-            st.session_state.msg_pele = None
-            st.rerun()
+    balance = data["screen_time"].get(user_select, 0)
+    st.subheader(f"שלום {user_select}! 🦜 יתרה: {balance} דקות")
 
     # --- סטופר ---
     st.subheader("⏱️ סטופר זמן מסך")
     col1, col2 = st.columns(2)
-    active_watches = data.setdefault("active_stopwatches", {})
+    active_watches = data.get("active_stopwatches", {})
     
     if user_select not in active_watches:
         if col1.button("▶️ התחל זמן מסך"):
@@ -138,10 +121,12 @@ if user_select:
             save_data(data)
             st.rerun()
     else:
-        elapsed = int((time.time() - active_watches[user_select]) / 60)
-        st.warning(f"זמן מסך פעיל: {elapsed} דקות")
+        start_time = active_watches[user_select]
+        elapsed_now = int((time.time() - start_time) / 60)
+        st.warning(f"זמן מסך פעיל: כ-{elapsed_now} דקות")
         if col2.button("⏹️ עצור ועדכן"):
-            data['screen_time'][user_select] -= max(1, elapsed)
+            duration_mins = max(1, int((time.time() - start_time) / 60))
+            data['screen_time'][user_select] -= duration_mins
             data["active_stopwatches"].pop(user_select, None)
             save_data(data)
             st.rerun()
@@ -152,6 +137,7 @@ if user_select:
     st.subheader("🧹 דיווח על משימה")
     cat_display = st.radio("סוג משימה:", ["משימות אישיות", "משימות בית"], horizontal=True)
     cat_key = "personal" if cat_display == "משימות אישיות" else "home"
+    
     t_list = list(TASKS_DB[cat_key].keys()) + ["אחר"]
     t_choice = st.selectbox("בחר משימה:", t_list)
     c_name = st.text_input("שם המשימה:") if t_choice == "אחר" else ""
@@ -163,36 +149,68 @@ if user_select:
             status = "approved" if role == "parent" else "pending"
             
             new_task = {
-                "id": time.time(), "user": user_select, "task": f_name,
-                "reward": reward, "status": status, "time": datetime.now().strftime("%H:%M")
+                "id": time.time(),
+                "user": user_select,
+                "task": f_name,
+                "reward": reward,
+                "status": status,
+                "time": datetime.now().strftime("%H:%M")
             }
-            data["tasks_today"].append(new_task)
             
+            data["tasks_today"].append(new_task)
             if status == "approved":
                 data['screen_time'][user_select] += reward
-                st.session_state.msg_pele = generate_pele_response(user_select, f_name)
             
             save_data(data)
+            st.session_state.msg_task = f"המשימה '{f_name}' נרשמה!"
             st.rerun()
+
+    if st.session_state.msg_task:
+        st.success(st.session_state.msg_task)
+        st.session_state.msg_task = None
 
     st.divider()
 
-    # --- אישור משימות (הורים) ---
+    # --- ניהול משימות (להורים) ---
     if role == "parent":
         st.subheader("📋 אישור משימות ילדים")
-        pending = [t for t in data["tasks_today"] if t.get("status") == "pending"]
-        for task in pending:
-            with st.container():
-                st.markdown(f'<div class="task-card"><b>{task["user"]}</b>: {task["task"]}</div>', unsafe_allow_html=True)
-                if st.button(f"אשר ל{task['user']}", key=f"aprv_{task['id']}"):
-                    for t in data["tasks_today"]:
-                        if t.get("id") == task["id"]: t["status"] = "approved"
-                    data["screen_time"][task["user"]] += task["reward"]
-                    st.session_state.msg_pele = generate_pele_response(task["user"], task["task"])
-                    save_data(data)
-                    st.rerun()
+        pending_tasks = [t for t in data["tasks_today"] if t.get("status") == "pending"]
+        
+        if not pending_tasks:
+            st.info("אין משימות הממתינות לאישור.")
+        else:
+            for task in pending_tasks:
+                with st.container():
+                    st.markdown(f"""
+                    <div class="task-card">
+                        <b>{task['user']}</b> סיים את המשימה: <b>{task['task']}</b><br>
+                        זמן: {task['time']} | פרס: {task['reward']} דקות
+                    </div>
+                    """, unsafe_allow_html=True)
+                    if st.button(f"אשר משימה ל{task['user']}", key=f"btn_{task['id']}"):
+                        for original_task in data["tasks_today"]:
+                            if original_task.get("id") == task["id"]:
+                                original_task["status"] = "approved"
+                                break
+                        data["screen_time"][task["user"]] += task["reward"]
+                        save_data(data)
+                        st.rerun()
 
-    # --- היסטוריה יומית ---
-    st.subheader("✅ מה עשינו היום")
+    # --- תצוגת משימות יומיות ---
+    st.subheader("✅ משימות שבוצעו היום")
+    if not data["tasks_today"]:
+        st.write("עוד לא בוצעו משימות היום.")
     for t in data["tasks_today"]:
-        st.write(f"{'✔️' if t['status']=='approved' else '⏳'} {t['user']}: {t['task']}")
+        icon = "✔️" if t.get("status") == "approved" else "⏳"
+        st.write(f"{icon} {t['user']}: {t['task']} ({t['reward']} דק')")
+
+    # --- עדכון ידני (להורים) ---
+    if role == "parent":
+        st.divider()
+        st.subheader("⚙️ עדכון יתרה ידני")
+        target_u = st.selectbox("בחר משתמש לעדכון:", list(USERS.keys()))
+        u_val = st.number_input("דקות להוספה/הפחתה:", step=1, value=0)
+        if st.button("בצע עדכון ידני"):
+            data['screen_time'][target_u] += u_val
+            save_data(data)
+            st.rerun()
