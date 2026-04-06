@@ -5,7 +5,7 @@ import time
 from datetime import datetime
 import google.generativeai as genai
 
-# הגדרות API (לצורך מחמאות יצירתיות)
+# הגדרות API
 if "GEMINI_API_KEY" in st.secrets:
     genai.configure(api_key=st.secrets["GEMINI_API_KEY"])
     model = genai.GenerativeModel('gemini-1.5-flash')
@@ -53,19 +53,30 @@ TASKS_DB = {
 DATA_FILE = 'family_data.json'
 
 def generate_pele_compliment(name, task_name):
-    """מחולל מחמאה יצירתית בלבד מפלא התוכי"""
+    """מחולל מחמאה יצירתית ורלוונטית למשימה"""
     role_desc = "אבא" if name == "שי" else "אמא" if name == "ענבל" else "ילד" if name == "בארי" else "ילדה בת 9"
+    
+    # הנחיות ספציפיות לפי סוג משימה
     prompt = f"""
-    אתה 'פלא', תוכי חכם ומעודד. המשתמש {name} (שהוא {role_desc}) סיים את המשימה: {task_name}.
-    כתוב מחמאה אחת קצרה, יצירתית ומקורית מאוד (משפט אחד או שניים).
-    אל תספר בדיחות, אל תדבר על תחביבים ואל תזכיר שכנים. רק מחמאה מפרגנת שתעשה לו/לה חיוך.
-    פנה ל{name} בצורה מתאימה (זכר/נקבה). טון: חביב וענייני.
+    אתה 'פלא', תוכי חכם ומעודד שחי עם משפחת פלא.
+    המשתמש {name} (שהוא {role_desc}) סיים את המשימה: {task_name}.
+    
+    המשימה שלך: כתוב מחמאה קצרה (משפט או שניים) שחייבת להיות רלוונטית לתוכן המשימה!
+    - אם זו 'תפילה': התמקד בכוונה, בנחת רוח או בחיבור.
+    - אם זו משימת ניקיון: התמקד בברק של הבית ובסדר.
+    - אם זו משימת ספורט: התמקד באנרגיה ובבריאות.
+    - אם זו קריאה/עבודה: התמקד בחכמה ובריכוז.
+    
+    דגשים:
+    - אל תשתמש במחמאות גנריות שלא קשורות למעשה.
+    - פנה ל{name} בצורה מתאימה (זכר/נקבה).
+    - טון: חביב, ענייני, מעט הומוריסטי אבל מכבד.
     """
     try:
         response = model.generate_content(prompt)
         return response.text.strip()
     except:
-        return f"{name}, ביצוע מושלם! הבית נראה טוב יותר בזכותך."
+        return f"כל הכבוד {name} על ביצוע משימת {task_name}!"
 
 def load_data():
     default_data = {
@@ -140,28 +151,27 @@ if user_select:
             reward = TASKS_DB[cat_key].get(t_choice, 15)
             status = "approved" if role == "parent" else "pending"
             
+            # יצירת המחמאה הרלוונטית
+            compliment = generate_pele_compliment(user_select, f_name)
+            
             new_task = {
                 "id": time.time(), "user": user_select, "task": f_name,
                 "reward": reward, "status": status, "time": datetime.now().strftime("%H:%M")
             }
             data["tasks_today"].append(new_task)
             
-            # יצירת המחמאה של פלא
-            compliment = generate_pele_compliment(user_select, f_name)
-            
             if status == "approved":
                 data['screen_time'][user_select] += reward
-                st.session_state.msg_task = f"✅ המשימה נרשמה! 🦜 פלא אומר: {compliment}"
+                st.session_state.msg_task = f"✅ המשימה נרשמה! 🦜 פלא: {compliment}"
             else:
-                st.session_state.msg_task = f"⏳ המשימה נשלחה לאישור ההורים. 🦜 פלא אומר: {compliment}"
+                st.session_state.msg_task = f"⏳ נשלח לאישור הורים. 🦜 פלא: {compliment}"
             
             save_data(data)
             st.rerun()
 
-    # הצגת הפידבק בצמוד ללחצן
     if st.session_state.msg_task:
         st.success(st.session_state.msg_task)
-        if st.button("הבנתי, תודה!"):
+        if st.button("הבנתי!"):
             st.session_state.msg_task = None
             st.rerun()
 
@@ -194,7 +204,5 @@ if user_select:
 
     # --- היסטוריה יומית ---
     st.subheader("✅ מה עשינו היום")
-    if not data["tasks_today"]:
-        st.write("עוד לא בוצעו משימות היום.")
     for t in data["tasks_today"]:
         st.write(f"{'✔️' if t['status']=='approved' else '⏳'} {t['user']}: {t['task']}")
