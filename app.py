@@ -35,21 +35,29 @@ p, div, span, h1, h2, h3, h4, h5, h6, label {
     font-weight: bold; 
     height: 3.5rem;
 }
+.pele-summary {
+    background: white; 
+    padding: 25px; 
+    border-radius: 25px; 
+    border: 5px solid #ff6b6b; 
+    color: #333 !important; 
+    margin-top: 20px;
+    box-shadow: 0 4px 15px rgba(0,0,0,0.1);
+}
+.pele-speech {
+    background: #fff3cd;
+    border: 2px solid #ff9f43;
+    padding: 20px;
+    border-radius: 15px;
+    margin: 10px 0;
+    color: #856404;
+}
 .task-card {
     background: white; 
     padding: 15px; 
     border-radius: 15px; 
     border-right: 10px solid #ff6b6b; 
     margin-bottom: 10px;
-}
-.pele-speech {
-    background: #fff3cd;
-    border: 2px solid #ff9f43;
-    padding: 15px;
-    border-radius: 15px;
-    margin: 10px 0;
-    font-size: 1.2rem;
-    font-weight: 500;
 }
 </style>
 """, unsafe_allow_html=True)
@@ -61,41 +69,38 @@ TASKS_DB = {
 }
 DATA_FILE = 'family_data.json'
 
-def generate_pele_compliment(name, task_name):
-    """מחולל מחמאה חופשית ויצירתית במיוחד"""
+def generate_pele_feedback(name, task_name, is_summary=False, tasks_list=None):
+    """מחולל את כל סוגי התגובות של פלא - עם בדיחות, סיפורים ומעוף"""
     role_desc = "אבא" if name == "שי" else "אמא" if name == "ענבל" else "ילד" if name == "בארי" else "ילדה בת 9"
     
-    prompt = f"""
-    אתה 'פלא', תוכי צבעוני, חכם, קצת פילוסוף ומאוד מפרגן. 
-    המשתמש {name} (שהוא {role_desc}) סיים את המשימה: {task_name}.
+    if is_summary:
+        tasks_str = ", ".join([f"{t['user']} שסיים {t['task']}" for t in tasks_list])
+        prompt = f"""
+        אתה 'פלא', תוכי חכם, צבעוני וקצת משוגע. כתוב סיכום יומי עסיסי למשפחת פלא על המשימות: {tasks_str}.
+        דגשים:
+        1. כתוב פסקה אחת ארוכה, ציורית ומלאה ב'מעוף'.
+        2. המצא סיפור מצחיק על מה עשית היום בזמן שהם עבדו (תחביבים הזויים).
+        3. שלב בדיחת קרש אחת מעולה שמתאימה לילדים.
+        4. שי הוא האבא, טנא בת 9. פנה אליהם בהתאם.
+        5. בלי חזרה מהשכנים.
+        """
+    else:
+        prompt = f"""
+        אתה 'פלא', תוכי מפרגן עם חוש הומור מוזר. {name} ({role_desc}) סיים/ה הרגע {task_name}.
+        כתוב תגובה קצרה שכוללת:
+        1. מחמאה סופר יצירתית ומטאפורית.
+        2. בדיחת קרש קצרה ומצחיקה.
+        3. עדכון קצר על תחביב חדש שהמצאת לעצמך הרגע.
+        בלי שכנים. פנה במין הנכון.
+        """
     
-    המשימה שלך: כתוב מחמאה יצירתית, ציורית ומקורית (1-2 משפטים). 
-    קח חופש אומנותי מלא! 
-    - אם זו תפילה: דבר על האור, על השקט הפנימי, על המילים שעולות למעלה.
-    - אם זו משימת בית: דבר על הבית שמרגיש פתאום כמו ארמון, על הקסם שבידיים שלהם.
-    - אם זה ספורט: דבר על כוח של נמר, על אנרגיה שמתפרצת.
-    - אם זו טנא בת ה-9: תהיה קצת קסום ומחזק. 
-    - אם זה שי האבא: תהיה מעריך ומלא כבוד.
-
-    דגשים:
-    - אל תהיה בנאלי. אל תגיד רק "כל הכבוד".
-    - השתמש בדימויים (כמו: "הנוצות שלי רועדות מהתרגשות", "צבעת את הבית בצבעים של נחת").
-    - פנה במין הנכון.
-    """
     try:
-        response = model.generate_content(prompt)
-        return response.text.strip()
+        return model.generate_content(prompt).text.strip()
     except:
-        return f"{name}, אתה פשוט פלא! המשימה {task_name} בוצעה בסטייל."
+        return f"{name}, אתה פשוט פלא! (והייתי מספר בדיחה אבל נתקע לי גרעין בגרון)."
 
 def load_data():
-    default_data = {
-        "screen_time": {u: 0 for u in USERS}, 
-        "tasks_today": [], 
-        "last_date": str(datetime.now().date()), 
-        "updates_applied": [],
-        "active_stopwatches": {} 
-    }
+    default_data = {"screen_time": {u: 0 for u in USERS}, "tasks_today": [], "last_date": str(datetime.now().date()), "active_stopwatches": {}}
     if os.path.exists(DATA_FILE):
         try:
             with open(DATA_FILE, 'r', encoding='utf-8') as f:
@@ -130,13 +135,7 @@ if user_select:
     st.subheader("⏱️ סטופר זמן מסך")
     col1, col2 = st.columns(2)
     active_watches = data.setdefault("active_stopwatches", {})
-    
-    if user_select not in active_watches:
-        if col1.button("▶️ התחל זמן מסך"):
-            data["active_stopwatches"][user_select] = time.time()
-            save_data(data)
-            st.rerun()
-    else:
+    if user_select in active_watches:
         elapsed = int((time.time() - active_watches[user_select]) / 60)
         st.warning(f"זמן מסך פעיל: {elapsed} דקות")
         if col2.button("⏹️ עצור ועדכן"):
@@ -144,6 +143,10 @@ if user_select:
             data["active_stopwatches"].pop(user_select, None)
             save_data(data)
             st.rerun()
+    elif col1.button("▶️ התחל זמן מסך"):
+        data["active_stopwatches"][user_select] = time.time()
+        save_data(data)
+        st.rerun()
 
     st.divider()
     
@@ -151,8 +154,7 @@ if user_select:
     st.subheader("🧹 דיווח על משימה")
     cat_display = st.radio("סוג משימה:", ["משימות אישיות", "משימות בית"], horizontal=True)
     cat_key = "personal" if cat_display == "משימות אישיות" else "home"
-    t_list = list(TASKS_DB[cat_key].keys()) + ["אחר"]
-    t_choice = st.selectbox("בחר משימה:", t_list)
+    t_choice = st.selectbox("בחר משימה:", list(TASKS_DB[cat_key].keys()) + ["אחר"])
     c_name = st.text_input("שם המשימה:") if t_choice == "אחר" else ""
 
     if st.button("סיימתי! ✨"):
@@ -161,25 +163,19 @@ if user_select:
             reward = TASKS_DB[cat_key].get(t_choice, 15)
             status = "approved" if role == "parent" else "pending"
             
-            # ג'נרוט המחמאה של פלא
-            compliment = generate_pele_compliment(user_select, f_name)
+            # תגובה מיידית מפלא
+            feedback = generate_pele_feedback(user_select, f_name)
             
-            new_task = {
-                "id": time.time(), "user": user_select, "task": f_name,
-                "reward": reward, "status": status, "time": datetime.now().strftime("%H:%M")
-            }
+            new_task = {"id": time.time(), "user": user_select, "task": f_name, "reward": reward, "status": status, "time": datetime.now().strftime("%H:%M")}
             data["tasks_today"].append(new_task)
+            if status == "approved": data['screen_time'][user_select] += reward
             
-            if status == "approved":
-                data['screen_time'][user_select] += reward
-            
-            st.session_state.msg_task = compliment
+            st.session_state.msg_task = feedback
             save_data(data)
             st.rerun()
 
-    # תצוגת המחמאה של פלא
     if st.session_state.msg_task:
-        st.markdown(f"""<div class="pele-speech"><b>🦜 פלא אומר:</b><br>{st.session_state.msg_task}</div>""", unsafe_allow_html=True)
+        st.markdown(f'<div class="pele-speech"><b>🦜 פלא אומר:</b><br>{st.session_state.msg_task}</div>', unsafe_allow_html=True)
         if st.button("תודה פלא!"):
             st.session_state.msg_task = None
             st.rerun()
@@ -190,23 +186,30 @@ if user_select:
     if role == "parent":
         st.subheader("📋 אישור משימות ילדים")
         pending = [t for t in data["tasks_today"] if t.get("status") == "pending"]
-        
-        if not pending:
-            st.info("אין משימות הממתינות לאישור.")
-            
         for task in pending:
             with st.container():
-                st.markdown(f'<div class="task-card"><b>{task["user"]}</b>: {task["task"]} ({task["reward"]} דק\')</div>', unsafe_allow_html=True)
+                st.markdown(f'<div class="task-card"><b>{task["user"]}</b>: {task["task"]}</div>', unsafe_allow_html=True)
                 c_aprv, c_rej = st.columns(2)
-                
                 if c_aprv.button(f"✅ אשר ל{task['user']}", key=f"aprv_{task['id']}"):
                     for t in data["tasks_today"]:
                         if t.get("id") == task["id"]: t["status"] = "approved"
                     data["screen_time"][task["user"]] += task["reward"]
                     save_data(data)
                     st.rerun()
-                
-                if c_rej.button(f"❌ אל תאשר", key=f"rej_{task['id']}"):
+                if c_rej.button(f"❌ דחה", key=f"rej_{task['id']}"):
                     data["tasks_today"] = [t for t in data["tasks_today"] if t.get("id") != task["id"]]
                     save_data(data)
                     st.rerun()
+
+    # --- סיכום יומי של פלא (המלא והמצחיק) ---
+    approved_tasks = [t for t in data["tasks_today"] if t['status'] == 'approved']
+    if approved_tasks:
+        st.subheader("🦜 סיכום היום של פלא")
+        if st.button("🔄 רענן סיכום יצירתי"):
+            st.session_state.daily_summary = generate_pele_feedback("משפחה", "", is_summary=True, tasks_list=approved_tasks)
+            st.rerun()
+        
+        if "daily_summary" not in st.session_state:
+            st.session_state.daily_summary = generate_pele_feedback("משפחה", "", is_summary=True, tasks_list=approved_tasks)
+        
+        st.markdown(f'<div class="pele-summary">{st.session_state.daily_summary}</div>', unsafe_allow_html=True)
