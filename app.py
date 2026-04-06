@@ -3,18 +3,18 @@ import json
 import os
 import time
 from datetime import datetime
+import google.generativeai as genai
 
-# הגדרות API (בדיקה שקיים לפני הגדרה)
-if "GEMINI_API_KEY" in st.secrets:
-    import google.generativeai as genai
-    genai.configure(api_key=st.secrets["GEMINI_API_KEY"])
+# הגדרות API
+GEMINI_API_KEY = st.secrets["GEMINI_API_KEY"]
+genai.configure(api_key=GEMINI_API_KEY)
 
-# אתחול Session State להודעות
+# אתחול Session State
 for k in ['msg_time', 'msg_task', 'msg_approve', 'msg_comp']:
     if k not in st.session_state:
         st.session_state[k] = None
 
-# עיצוב ה-UI
+# עיצוב CSS
 st.markdown("""
 <style>
 .stApp {
@@ -29,6 +29,8 @@ p, div, span, h1, h2, h3, h4, h5, h6, label {
 input, textarea, div[data-baseweb="select"] > div, ul[role="listbox"], li[role="option"] {
     background-color: white !important; 
     color: black !important;
+    text-align: right !important; 
+    direction: rtl !important;
 }
 .stButton>button {
     background-color: #ff9f43 !important; 
@@ -36,7 +38,8 @@ input, textarea, div[data-baseweb="select"] > div, ul[role="listbox"], li[role="
     border-radius: 20px; 
     width: 100%; 
     font-weight: bold; 
-    height: 3.5rem;
+    height: 3.5rem; 
+    border: none;
 }
 .task-card {
     background: white; 
@@ -44,7 +47,6 @@ input, textarea, div[data-baseweb="select"] > div, ul[role="listbox"], li[role="
     border-radius: 15px; 
     border-right: 10px solid #ff6b6b; 
     margin-bottom: 10px;
-    color: #333;
 }
 </style>
 """, unsafe_allow_html=True)
@@ -69,29 +71,26 @@ def load_data():
         try:
             with open(DATA_FILE, 'r', encoding='utf-8') as f:
                 saved = json.load(f)
-                # מיזוג נתונים כדי לוודא שכל המפתחות קיימים
                 for key in default_data:
                     if key in saved: 
                         default_data[key] = saved[key]
                 return default_data
         except: 
-            return default_data
+            pass
     return default_data
 
 def save_data(d):
     with open(DATA_FILE, 'w', encoding='utf-8') as f:
         json.dump(d, f, ensure_ascii=False, indent=4)
 
-# טעינה ואימות מפתחות קריטיים
 data = load_data()
-if "active_stopwatches" not in data: data["active_stopwatches"] = {}
-if "tasks_today" not in data: data["tasks_today"] = []
 
 # עדכון יתרות חד-פעמי
 if "time_update_april_2026" not in data.get("updates_applied", []):
-    for u, amt in [("טנא", 720), ("בארי", 300)]:
-        data["screen_time"][u] = data["screen_time"].get(u, 0) + amt
-    data.setdefault("updates_applied", []).append("time_update_april_2026")
+    data["screen_time"]["טנא"] += 720
+    data["screen_time"]["בארי"] += 300
+    if "updates_applied" not in data: data["updates_applied"] = []
+    data["updates_applied"].append("time_update_april_2026")
     save_data(data)
 
 # איפוס יומי
@@ -107,8 +106,7 @@ user_select = st.selectbox("מי המשתמש?", [""] + list(USERS.keys()))
 
 if user_select:
     role = USERS[user_select]
-    balance = data["screen_time"].get(user_select, 0)
-    st.subheader(f"שלום {user_select}! 🦜 יתרה: {balance} דקות")
+    st.subheader(f"שלום {user_select}! 🦜 יתרה: {data['screen_time'][user_select]} דקות")
 
     # --- סטופר ---
     st.subheader("⏱️ סטופר זמן מסך")
@@ -117,7 +115,7 @@ if user_select:
     
     if user_select not in active_watches:
         if col1.button("▶️ התחל זמן מסך"):
-            data["active_stopwatches"][user_select] = time.time()
+            data.setdefault("active_stopwatches", {})[user_select] = time.time()
             save_data(data)
             st.rerun()
     else:
@@ -127,7 +125,7 @@ if user_select:
         if col2.button("⏹️ עצור ועדכן"):
             duration_mins = max(1, int((time.time() - start_time) / 60))
             data['screen_time'][user_select] -= duration_mins
-            data["active_stopwatches"].pop(user_select, None)
+            del data["active_stopwatches"][user_select]
             save_data(data)
             st.rerun()
 
@@ -137,7 +135,6 @@ if user_select:
     st.subheader("🧹 דיווח על משימה")
     cat_display = st.radio("סוג משימה:", ["משימות אישיות", "משימות בית"], horizontal=True)
     cat_key = "personal" if cat_display == "משימות אישיות" else "home"
-    
     t_list = list(TASKS_DB[cat_key].keys()) + ["אחר"]
     t_choice = st.selectbox("בחר משימה:", t_list)
     c_name = st.text_input("שם המשימה:") if t_choice == "אחר" else ""
@@ -174,12 +171,12 @@ if user_select:
     # --- ניהול משימות (להורים) ---
     if role == "parent":
         st.subheader("📋 אישור משימות ילדים")
-        pending_tasks = [t for t in data["tasks_today"] if t.get("status") == "pending"]
+        pending_tasks = [t for t in data["tasks_today"] if t["status"] == "pending"]
         
         if not pending_tasks:
             st.info("אין משימות הממתינות לאישור.")
         else:
-            for task in pending_tasks:
+            for i, task in enumerate(pending_tasks):
                 with st.container():
                     st.markdown(f"""
                     <div class="task-card">
@@ -188,20 +185,20 @@ if user_select:
                     </div>
                     """, unsafe_allow_html=True)
                     if st.button(f"אשר משימה ל{task['user']}", key=f"btn_{task['id']}"):
+                        # עדכון סטטוס המשימה במאגר המקורי
                         for original_task in data["tasks_today"]:
                             if original_task.get("id") == task["id"]:
                                 original_task["status"] = "approved"
                                 break
+                        
                         data["screen_time"][task["user"]] += task["reward"]
                         save_data(data)
                         st.rerun()
 
-    # --- תצוגת משימות יומיות ---
+    # --- תצוגת משימות שהושלמו היום ---
     st.subheader("✅ משימות שבוצעו היום")
-    if not data["tasks_today"]:
-        st.write("עוד לא בוצעו משימות היום.")
     for t in data["tasks_today"]:
-        icon = "✔️" if t.get("status") == "approved" else "⏳"
+        icon = "✔️" if t["status"] == "approved" else "⏳"
         st.write(f"{icon} {t['user']}: {t['task']} ({t['reward']} דק')")
 
     # --- עדכון ידני (להורים) ---
