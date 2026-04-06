@@ -37,14 +37,14 @@ p, div, span, h1, h2, h3, h4, h5, h6, label {
 }
 .pele-summary-box {
     background: white; 
-    padding: 25px; 
+    padding: 30px; 
     border-radius: 25px; 
-    border: 5px solid #ff6b6b; 
-    color: #333 !important; 
+    border: 6px solid #ff6b6b; 
+    color: #222 !important; 
     margin-top: 20px;
-    box-shadow: 0 4px 15px rgba(0,0,0,0.1);
-    font-size: 1.2rem;
-    line-height: 1.6;
+    box-shadow: 0 10px 25px rgba(0,0,0,0.1);
+    font-size: 1.15rem;
+    line-height: 1.8;
 }
 .pele-speech {
     background: #fff3cd;
@@ -72,48 +72,52 @@ TASKS_DB = {
 DATA_FILE = 'family_data.json'
 
 def generate_pele_feedback(name, task_name):
-    """מחמאה מהירה על ביצוע משימה בודדת"""
+    """מחמאה מהירה על משימה בודדת"""
     role_desc = "אבא" if name == "שי" else "אמא" if name == "ענבל" else "ילד" if name == "בארי" else "ילדה בת 9"
-    prompt = f"אתה פלא התוכי. {name} ({role_desc}) סיים/ה {task_name}. כתוב מחמאה קצרה, יצירתית, מצחיקה ומאוד מטאפורית. בלי שכנים. פנה במין הנכון."
+    prompt = f"אתה פלא התוכי. {name} ({role_desc}) סיים/ה {task_name}. כתוב מחמאה קצרה, יצירתית ומצחיקה. פנה במין הנכון."
     try:
         return model.generate_content(prompt).text.strip()
     except:
-        return f"{name}, אתה פשוט פלא! המשימה בוצעה בסטייל."
+        return f"{name}, אתה פשוט פלא!"
 
 def generate_full_daily_summary(tasks):
-    """הפונקציה המרכזית: סיכום יום מלא, מצחיק ויצירתי"""
+    """סיכום יום ארוך, מפורט, משמעותי ומצחיק במיוחד"""
     if not tasks:
-        return "אף אחד עוד לא עשה כלום היום? אני ישבתי על הכלוב וחיכיתי לשווא! קדימה, לעבודה!"
+        return "שקט בבית... שקט מדי. הנוצות שלי מתייבשות מרוב שיעמום! מישהו מוכן לעשות איזו משימה כדי שיהיה לי על מה לכתוב?"
     
-    # ארגון המשימות לפי משתמשים
     summary_data = {}
     for t in tasks:
         if t['status'] == 'approved':
             summary_data.setdefault(t['user'], []).append(t['task'])
     
-    tasks_details = "\n".join([f"- {user} עשה/תה: {', '.join(tasks_list)}" for user, tasks_list in summary_data.items()])
+    tasks_details = "\n".join([f"- {user}: {', '.join(tasks_list)}" for user, tasks_list in summary_data.items()])
     
     prompt = f"""
-    אתה 'פלא', תוכי חכם, צבעוני, מצחיק מאוד ומלא דמיון. 
-    עבור על רשימת המשימות שאושרו היום במשפחת פלא:
+    אתה 'פלא', תוכי מזן 'קוקטייל פילוסופי' – אינטליגנטי, מצחיק בטירוף, ציורי וחד עין. 
+    עבור על הרשימה של בני משפחת פלא שביצעו משימות היום:
     {tasks_details}
 
-    כתוב סיכום יום חגיגי בפורמט הבא:
-    1. פתיח מצחיק: ספר סיפור קצר והזוי על ה"מעללים" שלך היום כתוכי (למשל: ניסית ללמד את השואב אבק לרקוד, או תכננת מסע סביב הסלון על גב של נמלה).
-    2. פרגון אישי: עבור על כל אחד מהמשתמשים שהופיעו ברשימה ותן להם מחמאה ספציפית, מצחיקה ומלאת מעוף על מה שהם עשו.
-       - שי הוא האבא (זכר).
-       - טנא היא ילדה בת 9 (נקבה).
-    3. בדיחת קרש: סיים בבדיחת קרש "של תוכים" או בדיחה שמתאימה לילדים.
+    כתוב סיכום יום ארוך (לפחות 3-4 פסקאות משמעותיות) בטון של "יומן מסע קסום":
     
-    דגשים קריטיים:
-    - בלי להזכיר חזרה מהשכנים.
-    - טון: יצירתי, ענייני אך מצחיק, לא מתלהם.
-    - אל תשתמש ברשימות תבליטים יבשות - כתוב את זה כסיפור זורם ומלהיב.
+    1. **פרק המעללים של פלא:** פתח בתיאור מפורט והזוי של מה שעבר עליך היום בבית בזמן שכולם עבדו. אולי ניסית לפרוץ לכספת הגרעינים? אולי ניהלת משא ומתן עם המראה בסלון? תהיה יצירתי ומצחיק מאוד.
+    
+    2. **היכל התהילה המשפחתי:** עבור אחד-אחד על כל מי שביצע משימה (שי האבא, ענבל האמא, בארי וטנא בת ה-9). 
+       לכל אחד תן פסקה מפרגנת בטירוף. אל תגיד רק "כל הכבוד", אלא תאר איך המשימה שלהם שינתה את האנרגיה בבית. 
+       שימוש במטאפורות (למשל: "שי לא רק התפלל, הוא הרעיד את אמות הסיפים של הכלוב שלי עם הכוונה שלו").
+    
+    3. **תובנת התוכי היומית:** תן מסר קצר ומשמעותי על עבודת צוות או על הבית כקן חמים.
+    
+    4. **הקינוח:** סיים בבדיחת קרש "של אבות" או "של תוכים" שתפיל אותנו מהרגליים.
+
+    דגשים חשובים:
+    - פנה לשי כאבא ולטנא כילדה בת 9.
+    - בלי חזרה מהשכנים.
+    - הטקסט צריך להיות עשיר, ססגוני ומפורט מאוד - לא סיכום יבש!
     """
     try:
         return model.generate_content(prompt).text.strip()
     except:
-        return "היה יום מדהים! כולם עבדו כל כך קשה שאפילו הנוצות שלי התחילו להבריק מרחוק."
+        return "היה יום מופלא! כולם היו נהדרים, והבית פשוט נוצץ."
 
 def load_data():
     default_data = {"screen_time": {u: 0 for u in USERS}, "tasks_today": [], "last_date": str(datetime.now().date()), "active_stopwatches": {}}
@@ -147,7 +151,7 @@ if user_select:
     role = USERS[user_select]
     st.subheader(f"שלום {user_select}! 🦜 יתרה: {data['screen_time'].get(user_select, 0)} דקות")
 
-    # --- סטופר זמן מסך ---
+    # --- סטופר ---
     st.subheader("⏱️ סטופר זמן מסך")
     col1, col2 = st.columns(2)
     active_watches = data.setdefault("active_stopwatches", {})
@@ -178,8 +182,6 @@ if user_select:
         if f_name:
             reward = TASKS_DB[cat_key].get(t_choice, 15)
             status = "approved" if role == "parent" else "pending"
-            
-            # מחמאה מיידית
             st.session_state.msg_task = generate_pele_feedback(user_select, f_name)
             
             new_task = {"id": time.time(), "user": user_select, "task": f_name, "reward": reward, "status": status, "time": datetime.now().strftime("%H:%M")}
@@ -201,8 +203,6 @@ if user_select:
     if role == "parent":
         st.subheader("📋 אישור משימות ילדים")
         pending = [t for t in data["tasks_today"] if t.get("status") == "pending"]
-        if not pending:
-            st.info("אין משימות הממתינות לאישור.")
         for task in pending:
             with st.container():
                 st.markdown(f'<div class="task-card"><b>{task["user"]}</b>: {task["task"]}</div>', unsafe_allow_html=True)
@@ -218,16 +218,16 @@ if user_select:
                     save_data(data)
                     st.rerun()
 
-    # --- כפתור סיכום יום של פלא ---
+    # --- כפתור סיכום יום משודרג ---
     st.divider()
     st.subheader("🦜 רגע השיא של היום")
-    if st.button("🌟 פלא, סכם לנו את היום!"):
-        with st.spinner("פלא מסדר את הנוצות ונזכר מה קרה היום..."):
+    if st.button("🌟 פלא, פתח את יומן המסע היומי שלנו!"):
+        with st.spinner("פלא מנקה את המקור ומכין את הדיו..."):
             approved = [t for t in data["tasks_today"] if t['status'] == 'approved']
             st.session_state.daily_summary_text = generate_full_daily_summary(approved)
     
     if st.session_state.daily_summary_text:
-        st.markdown(f'<div class="pele-summary-box"><b>🦜 הסיכום היומי של פלא:</b><br><br>{st.session_state.daily_summary_text}</div>', unsafe_allow_html=True)
+        st.markdown(f'<div class="pele-summary-box"><b>🦜 דברי הימים של משפחת פלא:</b><br><br>{st.session_state.daily_summary_text}</div>', unsafe_allow_html=True)
         if st.button("סגור סיכום"):
             st.session_state.daily_summary_text = None
             st.rerun()
