@@ -5,12 +5,34 @@ import time
 from datetime import datetime
 import google.generativeai as genai
 
-
-# הגדרות API
+# --- אתחול והגדרות API חסינות לשגיאות ---
 if "GEMINI_API_KEY" in st.secrets:
     genai.configure(api_key=st.secrets["GEMINI_API_KEY"])
-    # שימוש במודל יציב ומהיר
-model = genai.GenerativeModel('gemini-pro')
+
+@st.cache_resource
+def get_working_model():
+    """
+    פונקציה שסורקת אילו מודלים זמינים בסביבת השרת הנוכחית
+    ובוחרת את הטוב ביותר כדי למנוע שגיאות 404 (Not Found).
+    """
+    try:
+        available_models = [m.name for m in genai.list_models() if 'generateContent' in m.supported_generation_methods]
+        
+        if 'models/gemini-1.5-flash' in available_models:
+            return genai.GenerativeModel('gemini-1.5-flash')
+        elif 'models/gemini-1.5-flash-latest' in available_models:
+            return genai.GenerativeModel('gemini-1.5-flash-latest')
+        elif 'models/gemini-pro' in available_models:
+            return genai.GenerativeModel('gemini-pro')
+        elif available_models:
+            return genai.GenerativeModel(available_models[0])
+        else:
+            return genai.GenerativeModel('gemini-pro')
+    except:
+        return genai.GenerativeModel('gemini-pro')
+
+model = get_working_model()
+# ----------------------------------------
 
 # אתחול Session State
 for k in ['msg_time', 'msg_task', 'msg_approve', 'daily_summary_text']:
@@ -183,83 +205,4 @@ if user_select:
         elapsed = int((time.time() - active_watches[user_select]) / 60)
         st.warning(f"זמן מסך פעיל: {elapsed} דקות")
         if col2.button("⏹️ עצור ועדכן"):
-            # הפחתת הזמן בפועל (מינימום 0 דקות למקרה שעצרו מיד)
-            data['screen_time'][user_select] -= max(0, elapsed)
-            data["active_stopwatches"].pop(user_select, None)
-            save_data(data)
-            st.rerun()
-    elif col1.button("▶️ התחל זמן מסך"):
-        data["active_stopwatches"][user_select] = time.time()
-        save_data(data)
-        st.rerun()
-
-    st.divider()
-    
-    # --- דיווח משימות ---
-    st.subheader("🧹 דיווח על משימה")
-    cat_display = st.radio("סוג משימה:", ["משימות אישיות", "משימות בית"], horizontal=True)
-    cat_key = "personal" if cat_display == "משימות אישיות" else "home"
-    t_choice = st.selectbox("בחר משימה:", list(TASKS_DB[cat_key].keys()) + ["אחר"])
-    c_name = st.text_input("שם המשימה:") if t_choice == "אחר" else ""
-
-    if st.button("סיימתי! ✨"):
-        f_name = c_name if t_choice == "אחר" else t_choice
-        if f_name:
-            reward = TASKS_DB[cat_key].get(t_choice, 15)
-            status = "approved" if role == "parent" else "pending"
-            st.session_state.msg_task = generate_pele_feedback(user_select, f_name)
-            
-            new_task = {"id": time.time(), "user": user_select, "task": f_name, "reward": reward, "status": status, "time": datetime.now().strftime("%H:%M")}
-            data["tasks_today"].append(new_task)
-            
-            if status == "approved": 
-                data['screen_time'][user_select] += reward
-            
-            save_data(data)
-            st.rerun()
-
-    if st.session_state.msg_task:
-        st.markdown(f'<div class="pele-speech"><b>🦜 פלא אומר:</b><br>{st.session_state.msg_task}</div>', unsafe_allow_html=True)
-        if st.button("תודה פלא!"):
-            st.session_state.msg_task = None
-            st.rerun()
-
-    st.divider()
-
-    # --- אישור משימות (הורים) ---
-    if role == "parent":
-        st.subheader("📋 אישור משימות ילדים")
-        pending = [t for t in data["tasks_today"] if t.get("status") == "pending"]
-        
-        if not pending:
-            st.write("אין משימות הממתינות לאישור כרגע.")
-            
-        for task in pending:
-            with st.container():
-                st.markdown(f'<div class="task-card"><b>{task["user"]}</b>: {task["task"]} ({task["reward"]} דקות)</div>', unsafe_allow_html=True)
-                c_aprv, c_rej = st.columns(2)
-                if c_aprv.button(f"✅ אשר ל{task['user']}", key=f"aprv_{task['id']}"):
-                    for t in data["tasks_today"]:
-                        if t.get("id") == task["id"]: 
-                            t["status"] = "approved"
-                    data["screen_time"][task["user"]] += task["reward"]
-                    save_data(data)
-                    st.rerun()
-                if c_rej.button(f"❌ דחה", key=f"rej_{task['id']}"):
-                    data["tasks_today"] = [t for t in data["tasks_today"] if t.get("id") != task["id"]]
-                    save_data(data)
-                    st.rerun()
-
-    # --- כפתור סיכום יום האפי ---
-    st.divider()
-    st.subheader("🦜 רגע השיא של היום")
-    if st.button("🌟 פלא, פתח את יומן המסע היומי שלנו!"):
-        with st.spinner("פלא מחדד את הנוצות וכותב היסטוריה..."):
-            approved = [t for t in data["tasks_today"] if t.get('status') == 'approved']
-            st.session_state.daily_summary_text = generate_full_daily_summary(approved)
-    
-    if st.session_state.daily_summary_text:
-        st.markdown(f'<div class="pele-summary-box"><b>📜 דברי הימים של משפחת פלא:</b><br><br>{st.session_state.daily_summary_text}</div>', unsafe_allow_html=True)
-        if st.button("סגור סיכום"):
-            st.session_state.daily_summary_text = None
-            st.rerun()
+            # הפחתת הזמן בפועל (מינימו
