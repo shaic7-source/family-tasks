@@ -5,6 +5,7 @@ import time
 from datetime import datetime
 import google.generativeai as genai
 
+
 # הגדרות API
 if "GEMINI_API_KEY" in st.secrets:
     genai.configure(api_key=st.secrets["GEMINI_API_KEY"])
