@@ -8,7 +8,7 @@ import google.generativeai as genai
 # הגדרות API
 if "GEMINI_API_KEY" in st.secrets:
     genai.configure(api_key=st.secrets["GEMINI_API_KEY"])
-    # שימוש במודל יציב יותר
+    # שימוש במודל יציב ומהיר
     model = genai.GenerativeModel('gemini-1.5-flash')
 
 # אתחול Session State
@@ -75,71 +75,82 @@ DATA_FILE = 'family_data.json'
 def generate_pele_feedback(name, task_name):
     """מחמאה מהירה על ביצוע משימה בודדת"""
     role_desc = "אבא" if name == "שי" else "אמא" if name == "ענבל" else "ילד" if name == "בארי" else "ילדה בת 9"
-    prompt = f"אתה פלא התוכי. {name} ({role_desc}) סיים/ה {task_name}. כתוב מחמאה יצירתית ומצחיקה. פנה במין הנכון."
+    prompt = f"אתה פלא התוכי. {name} ({role_desc}) סיים/ה {task_name}. כתוב מחמאה יצירתית ומצחיקה על סיום המשימה. פנה במין הנכון."
     try:
         return model.generate_content(prompt).text.strip()
     except:
-        return f"{name}, אתה פשוט פלא! שיחקת אותה עם ה{task_name}."
+        return f"קווה קווה! {name}, איזה פלא! שיחקת אותה עם ה{task_name}."
 
 def generate_full_daily_summary(tasks):
-    """סיכום יום מפורט, ארוך ואפי - בלי קיצורי דרך"""
+    """סיכום יום מפורט המשלב את משימות המשפחה יחד עם הרפתקאותיו של פלא התוכי"""
     if not tasks:
         return "הקן ריק ממשימות היום! אני יושב על הנדנדה שלי ומחכה שמישהו יזיז משהו. קדימה משפחת פלא, תנו לי חומר לכתיבה!"
     
     summary_data = {}
     for t in tasks:
-        if t['status'] == 'approved':
+        if t.get('status') == 'approved':
             summary_data.setdefault(t['user'], []).append(t['task'])
+            
+    if not summary_data:
+        return "קווה קווה! יש משימות שדווחו, אבל הן עדיין מחכות לאישור של ההורים. בינתיים אני מנקר גרעינים!"
     
     tasks_details = "\n".join([f"- {user}: {', '.join(tasks_list)}" for user, tasks_list in summary_data.items()])
     
     prompt = f"""
-    זהו מסמך חשוב: 'דברי הימים של משפחת פלא'. 
-    אתה פלא, התוכי המשפחתי - שנון, מלא מעוף, פילוסוף של גרעינים וחבר אמת.
-    
-    רשימת האירועים של היום:
+    אתה פלא, התוכי המשפחתי האהוב של משפחת פלא - שנון, משעשע, ומרגיש שהוא המנהל האמיתי של הבית.
+    עליך לכתוב את "סיכום היום של משפחת פלא" (לפחות 300 מילים) על סמך המשימות שבוצעו היום.
+
+    המשימות שבוצעו ואושרו היום (חובה להזכיר אותן!):
     {tasks_details}
 
-    עליך לכתוב סיכום ארוך ומפורט מאוד (מינימום 300 מילים) שכולל את הפרקים הבאים:
-    
-    1. **פרק המעללים של פלא:** ספר בפירוט ובצורה מצחיקה על יומך כתוכי בבית בזמן שכולם עבדו. תאר 'משימות' הזויות שעשית (למשל: תכנון מבצע לכיבוש המלחייה, או שיחת מוטיבציה עם העציץ). תהיה יצירתי והזוי!
-    
-    2. **מסדר הניצחון המשפחתי:** הקדש פסקה שלמה ומפורטת לכל משתתף מהרשימה לעיל. 
-       - פנה לשי כאבא (זכר).
-       - פנה לטנא כילדה בת 9 (נקבה).
-       - פנה לבארי כילד.
-       לכל אחד תן מחמאה מטאפורית עמוקה על המשימות שלו. תאר איך הן שינו את פני הבית והפכו אותו למקום זוהר יותר. אל תשתמש במילים בנאליות.
-    
-    3. **תובנת התוכי למנהיגות משפחתית:** פסקה פילוסופית על הקשר בין בני המשפחה והקן המשותף שלכם.
-    
-    4. **בדיחת היום של פלא:** סיים בבדיחת קרש 'של אבות' או 'של תוכים' שתשאיר את כולם עם חיוך.
+    על הסיכום להכיל את החלקים הבאים:
+    1. **הרפתקאות פלא בבית:** תאר סיפור קצר, יצירתי ומצחיק על מה שעשית בבית בזמן שכולם עבדו/למדו (למשל: תכנון מזימה להפיל כוס, שיחה פילוסופית עם המטאטא, או מלחמה בדמותך המשתקפת במראה). 
+    2. **חלוקת כבוד למשפחה:** הקדש פסקה לכל בן משפחה מהרשימה שביצע משימה היום. עליך לציין במפורש את המשימות הספציפיות שהוא ביצע (מהרשימה למעלה), ולהעניק לו פרגון אישי ומשעשע על כך. 
+       - הקפד לפנות במין הנכון: שי (אבא - זכר), ענבל (אמא - נקבה), בארי (ילד - זכר), טנא (ילדה בת 9 - נקבה).
+    3. **דברי חוכמה של תוכי:** משפט סיכום לפיתוח המורל המשפחתי.
+    4. **בדיחת תוכים:** סיים עם בדיחת קרש קשורה.
 
-    דגשים:
-    - אל תקצר. תהיה רחב לב בתיאורים.
-    - בלי חזרה מהשכנים.
-    - פנה לכל אחד במין הנכון ובכבוד הראוי.
+    דגש חשוב: אל תמציא משימות לאנשים, השתמש רק במשימות שהועברו ברשימה, אך שלב אותן בצורה סיפורית מפרגנת.
     """
     try:
-        # הגדלת ה-Safety Settings ופרמטרים כדי להבטיח תשובה ארוכה
         response = model.generate_content(prompt)
         if response and response.text:
             return response.text.strip()
         else:
             raise ValueError("Empty Response")
     except Exception as e:
-        # הודעת שגיאה מפורטת יותר לדיבאג פנימי אם נדרש
-        return f"אוי! ניסיתי לכתוב מגילה אבל נגמר לי הדיו במקור... (שגיאה: {str(e)[:50]}). נסו לרענן שוב!"
+        return f"רציתי לכתוב מגילה מטורפת, אבל נפל לי גרעין על המקלדת! (שגיאה: {str(e)[:50]}). נסו שוב מאוחר יותר!"
 
 def load_data():
-    default_data = {"screen_time": {u: 0 for u in USERS}, "tasks_today": [], "last_date": str(datetime.now().date()), "active_stopwatches": {}}
+    """טעינת הנתונים מהקובץ באופן מאובטח שאינו דורס את זמן המסך הקיים"""
+    default_data = {
+        "screen_time": {u: 0 for u in USERS}, 
+        "tasks_today": [], 
+        "last_date": str(datetime.now().date()), 
+        "active_stopwatches": {}
+    }
+    
     if os.path.exists(DATA_FILE):
         try:
             with open(DATA_FILE, 'r', encoding='utf-8') as f:
                 saved = json.load(f)
-                for key in default_data:
-                    if key in saved: default_data[key] = saved[key]
+                
+                # מיזוג זהיר של זמן המסך
+                if "screen_time" in saved:
+                    for u in USERS:
+                        default_data["screen_time"][u] = saved["screen_time"].get(u, 0)
+                        
+                if "tasks_today" in saved:
+                    default_data["tasks_today"] = saved["tasks_today"]
+                if "last_date" in saved:
+                    default_data["last_date"] = saved["last_date"]
+                if "active_stopwatches" in saved:
+                    default_data["active_stopwatches"] = saved["active_stopwatches"]
+                    
                 return default_data
-        except: return default_data
+        except:
+            pass
+            
     return default_data
 
 def save_data(d):
@@ -148,7 +159,7 @@ def save_data(d):
 
 data = load_data()
 
-# איפוס יומי
+# איפוס יומי - מוחק רק את רשימת המשימות להיום, ולא את זמן המסך
 today_str = str(datetime.now().date())
 if data.get("last_date") != today_str:
     data["tasks_today"] = []
@@ -166,11 +177,13 @@ if user_select:
     st.subheader("⏱️ סטופר זמן מסך")
     col1, col2 = st.columns(2)
     active_watches = data.setdefault("active_stopwatches", {})
+    
     if user_select in active_watches:
         elapsed = int((time.time() - active_watches[user_select]) / 60)
         st.warning(f"זמן מסך פעיל: {elapsed} דקות")
         if col2.button("⏹️ עצור ועדכן"):
-            data['screen_time'][user_select] -= max(1, elapsed)
+            # הפחתת הזמן בפועל (מינימום 0 דקות למקרה שעצרו מיד)
+            data['screen_time'][user_select] -= max(0, elapsed)
             data["active_stopwatches"].pop(user_select, None)
             save_data(data)
             st.rerun()
@@ -197,7 +210,9 @@ if user_select:
             
             new_task = {"id": time.time(), "user": user_select, "task": f_name, "reward": reward, "status": status, "time": datetime.now().strftime("%H:%M")}
             data["tasks_today"].append(new_task)
-            if status == "approved": data['screen_time'][user_select] += reward
+            
+            if status == "approved": 
+                data['screen_time'][user_select] += reward
             
             save_data(data)
             st.rerun()
@@ -214,13 +229,18 @@ if user_select:
     if role == "parent":
         st.subheader("📋 אישור משימות ילדים")
         pending = [t for t in data["tasks_today"] if t.get("status") == "pending"]
+        
+        if not pending:
+            st.write("אין משימות הממתינות לאישור כרגע.")
+            
         for task in pending:
             with st.container():
-                st.markdown(f'<div class="task-card"><b>{task["user"]}</b>: {task["task"]}</div>', unsafe_allow_html=True)
+                st.markdown(f'<div class="task-card"><b>{task["user"]}</b>: {task["task"]} ({task["reward"]} דקות)</div>', unsafe_allow_html=True)
                 c_aprv, c_rej = st.columns(2)
                 if c_aprv.button(f"✅ אשר ל{task['user']}", key=f"aprv_{task['id']}"):
                     for t in data["tasks_today"]:
-                        if t.get("id") == task["id"]: t["status"] = "approved"
+                        if t.get("id") == task["id"]: 
+                            t["status"] = "approved"
                     data["screen_time"][task["user"]] += task["reward"]
                     save_data(data)
                     st.rerun()
@@ -234,7 +254,7 @@ if user_select:
     st.subheader("🦜 רגע השיא של היום")
     if st.button("🌟 פלא, פתח את יומן המסע היומי שלנו!"):
         with st.spinner("פלא מחדד את הנוצות וכותב היסטוריה..."):
-            approved = [t for t in data["tasks_today"] if t['status'] == 'approved']
+            approved = [t for t in data["tasks_today"] if t.get('status') == 'approved']
             st.session_state.daily_summary_text = generate_full_daily_summary(approved)
     
     if st.session_state.daily_summary_text:
